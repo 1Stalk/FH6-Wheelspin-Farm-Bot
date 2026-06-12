@@ -1,0 +1,221 @@
+/* ============================================================
+   FH6 WheelSpin Farm Bot — Light Theme v1
+   Forza Horizon 6 — light theme (hero-section style):
+   · Background: #e9e9e9 offwhite / paper
+   · Text: #1d1d1d dark ink
+   · Accent: #caff02 lime, #fe0288 pink, #2cbca4 teal
+   · Panels: white / near-white surfaces
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── FH6 Brand Colors (constant in both themes) ─────────── */
+  --fh6-lime:          #caff02;
+  --fh6-lime-dim:      #a8d400;
+  --fh6-lime-glow:     rgba(202, 255, 2, 0.35);
+  --fh6-lime-faint:    rgba(202, 255, 2, 0.15);
+  --fh6-lime-solid:    #1a2000;  /* dark text on lime background */
+
+  --fh6-pink:          #fe0288;
+  --fh6-pink-dim:      #c8006a;
+  --fh6-pink-glow:     rgba(254, 2, 136, 0.25);
+  --fh6-pink-faint:    rgba(254, 2, 136, 0.10);
+
+  --fh6-teal:          #2cbca4;
+  --fh6-teal-glow:     rgba(44, 188, 164, 0.25);
+  --fh6-teal-faint:    rgba(44, 188, 164, 0.10);
+
+  --kofi-blue:          #29abe2;
+  --kofi-blue-dim:      #009ce0;
+  --kofi-blue-glow:     rgba(41, 171, 226, 0.25);
+  --kofi-blue-faint:    rgba(41, 171, 226, 0.10);
+
+  /* ── LIGHT Theme Backgrounds ─────────────────────────────── */
+  --bg-root:     #e9e9e9;   /* offwhite — FH6 hero bg */
+  --bg-dark:     #ebebeb;
+  --bg-ink:      #f4f4f4;
+  --bg-panel:    #ffffff;
+  --bg-surface:  #f8f8f8;
+  --bg-hover:    #efefef;
+  --bg-card:     #f0f0f0;
+
+  /* ── LIGHT Theme Text ────────────────────────────────────── */
+  --text-white:     #1d1d1d;   /* inverted */
+  --text-primary:   #1d1d1d;
+  --text-secondary: #4a4a4a;
+  --text-muted:     #888888;
+  --text-dim:       #bbbbbb;
+
+  /* ── LIGHT Theme Borders ─────────────────────────────────── */
+  --border:         rgba(0, 0, 0, 0.08);
+  --border-mid:     rgba(0, 0, 0, 0.14);
+  --border-focus:   rgba(0, 0, 0, 0.25);
+  --border-lime:    rgba(202, 255, 2, 0.60);
+  --border-pink:    rgba(254, 2,  136, 0.40);
+  --border-teal:    rgba(44,  188, 164, 0.40);
+
+  /* ── Spacing ──────────────────────────────────────────────── */
+  --gap-xs:  4px;
+  --gap-sm:  8px;
+  --gap-md:  12px;
+  --gap-lg:  16px;
+  --gap-xl:  24px;
+  --gap-2xl: 36px;
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Consolas', monospace;
+  --font:         'Barlow Condensed', sans-serif;
+
+  --fs-2xs: 9px;
+  --fs-xs:  11px;
+  --fs-sm:  12px;
+  --fs-md:  13px;
+  --fs-lg:  15px;
+  --fs-xl:  18px;
+  --fs-2xl: 22px;
+  --fs-3xl: 28px;
+  --fs-4xl: 36px;
+
+  /* ── Shape ────────────────────────────────────────────────── */
+  --radius:    2px;
+  --radius-sm: 1px;
+  --skew:      -8deg;
+  --clip-btn:  polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+  --clip-sm:   polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+  --clip-card: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+
+  /* Legacy aliases */
+  --neon-green:        var(--fh6-lime);
+  --neon-green-dim:    var(--fh6-lime-dim);
+  --neon-green-glow:   var(--fh6-lime-glow);
+  --neon-green-faint:  var(--fh6-lime-faint);
+  --neon-pink:         var(--fh6-pink);
+  --neon-pink-glow:    var(--fh6-pink-glow);
+  --neon-pink-faint:   var(--fh6-pink-faint);
+  --neon-yellow:       var(--fh6-lime);
+  --neon-yellow-glow:  var(--fh6-lime-glow);
+  --neon-cyan:         var(--fh6-teal);
+  --neon-cyan-glow:    var(--fh6-teal-glow);
+  --accent:            var(--fh6-lime);
+  --accent-dim:        var(--fh6-lime-dim);
+  --accent-faint:      var(--fh6-lime-faint);
+  --color-warn:        var(--fh6-lime);
+  --color-error:       var(--fh6-pink);
+  --color-idle:        var(--text-muted);
+  --color-paused:      var(--fh6-teal);
+  --bg-base:           var(--bg-root);
+  --bg-surface-old:    var(--bg-surface);
+  --border-focus-old:  var(--border-focus);
+  --border-neon:       var(--border-lime);
+}
+
+/* ── Reset & Base ────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg-root);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  user-select: none;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 1px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(202,255,2,0.6); }
+
+/* ── Base elements ────────────────────────────────────────── */
+button {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 5px 14px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+button:hover { background: var(--bg-hover); border-color: var(--border-focus); }
+button:active { background: #e0e0e0; }
+button:disabled { opacity: 0.30; cursor: not-allowed; }
+
+input[type="number"],
+input[type="text"] {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  background: var(--bg-ink);
+  color: var(--text-primary);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+}
+
+input:focus {
+  border-color: var(--fh6-lime-dim);
+  box-shadow: 0 0 0 2px var(--fh6-lime-faint);
+}
+
+/* ── Utility ──────────────────────────────────────────────── */
+.text-muted    { color: var(--text-muted); }
+.text-accent   { color: var(--fh6-lime-dim); }
+.text-warn     { color: var(--fh6-lime-dim); }
+.text-error    { color: var(--fh6-pink); }
+.text-cyan     { color: var(--fh6-teal); }
+.divider       { height: 1px; background: var(--border); margin: var(--gap-md) 0; }
+.mono          { font-family: var(--font-mono); }
+.upper         { text-transform: uppercase; letter-spacing: 0.10em; }
+
+/* ── FH6 Button Variants ──────────────────────────────────── */
+.btn-neon-green {
+  background: var(--fh6-lime);
+  border: 1.5px solid var(--fh6-lime-dim);
+  color: var(--fh6-lime-solid);
+  clip-path: var(--clip-btn);
+}
+.btn-neon-green:hover {
+  background: var(--fh6-lime-dim);
+  box-shadow: 0 4px 16px var(--fh6-lime-glow);
+}
+
+.btn-neon-pink {
+  background: transparent;
+  border: 1.5px solid var(--fh6-pink);
+  color: var(--fh6-pink);
+  clip-path: var(--clip-btn);
+}
+.btn-neon-pink:hover {
+  background: var(--fh6-pink-faint);
+  box-shadow: 0 4px 16px var(--fh6-pink-glow);
+}
+
+.btn-neon-yellow {
+  background: var(--fh6-lime);
+  border: 1.5px solid var(--fh6-lime-dim);
+  color: var(--fh6-lime-solid);
+  clip-path: var(--clip-btn);
+}
+.btn-neon-yellow:hover {
+  background: var(--fh6-lime-dim);
+  box-shadow: 0 4px 16px var(--fh6-lime-glow);
+}
