@@ -1,15 +1,6 @@
 use std::sync::Arc;
 use tauri::{Manager, Emitter};
-
-pub mod capture;
-pub mod config;
-pub mod controller;
-pub mod playback;
-pub mod state_machine;
-pub mod vision;
-pub mod stages;
-
-use crate::state_machine::BotFSM;
+use core_bot::state_machine::BotFSM;
 
 // Holds the background FSM instance in Tauri state
 pub struct BotState(pub Arc<BotFSM>);
@@ -39,7 +30,7 @@ fn resume_bot(state: tauri::State<'_, BotState>) {
 }
 
 #[tauri::command]
-fn update_config(state: tauri::State<'_, BotState>, new_config: crate::config::BotConfig) {
+fn update_config(state: tauri::State<'_, BotState>, new_config: core_bot::config::BotConfig) {
     state.0.update_config(new_config);
 }
 
@@ -73,15 +64,15 @@ fn run_gamepad_test(state: tauri::State<'_, BotState>) {
             let s = fsm.state.lock().unwrap();
             s.clone()
         };
-        if current != crate::state_machine::FSMState::Idle {
+        if current != core_bot::state_machine::FSMState::Idle {
             fsm.logger.warn("Cannot run gamepad test: bot is not idle");
             return;
         }
         
-        fsm.set_state(crate::state_machine::FSMState::TestInputs);
+        fsm.set_state(core_bot::state_machine::FSMState::TestInputs);
         let ctx = fsm.clone_ptrs();
-        crate::stages::run_gamepad_test(&ctx);
-        fsm.set_state(crate::state_machine::FSMState::Idle);
+        core_bot::stages::run_gamepad_test(&ctx);
+        fsm.set_state(core_bot::state_machine::FSMState::Idle);
     });
 }
 
@@ -93,23 +84,23 @@ fn run_nav_test(state: tauri::State<'_, BotState>, target: String) {
             let s = fsm.state.lock().unwrap();
             s.clone()
         };
-        if current != crate::state_machine::FSMState::Idle {
+        if current != core_bot::state_machine::FSMState::Idle {
             fsm.logger.warn("Cannot run nav test: bot is not idle");
             return;
         }
 
-        fsm.set_state(crate::state_machine::FSMState::Running);
+        fsm.set_state(core_bot::state_machine::FSMState::Running);
         let ctx = fsm.clone_ptrs();
         
         let _res = match target.as_str() {
-            "nav_to_stage1" => crate::stages::run_stage_by_name(&ctx, "nav_to_stage1"),
-            "nav_to_stage2" => crate::stages::run_stage_by_name(&ctx, "nav_to_stage2"),
-            "nav_to_stage3" => crate::stages::run_stage_by_name(&ctx, "nav_to_stage3"),
-            "nav_to_stage4" => crate::stages::run_stage_by_name(&ctx, "nav_to_stage4"),
-            _ => crate::stages::StageResult::Failed,
+            "nav_to_stage1" => core_bot::stages::run_stage_by_name(&ctx, "nav_to_stage1"),
+            "nav_to_stage2" => core_bot::stages::run_stage_by_name(&ctx, "nav_to_stage2"),
+            "nav_to_stage3" => core_bot::stages::run_stage_by_name(&ctx, "nav_to_stage3"),
+            "nav_to_stage4" => core_bot::stages::run_stage_by_name(&ctx, "nav_to_stage4"),
+            _ => core_bot::stages::StageResult::Failed,
         };
         
-        fsm.set_state(crate::state_machine::FSMState::Idle);
+        fsm.set_state(core_bot::state_machine::FSMState::Idle);
     });
 }
 
@@ -121,18 +112,18 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
             let s = fsm.state.lock().unwrap();
             s.clone()
         };
-        if current != crate::state_machine::FSMState::Idle {
+        if current != core_bot::state_machine::FSMState::Idle {
             fsm.logger.warn("Cannot run CV diagnostics: bot is not idle");
             return;
         }
 
-        fsm.set_state(crate::state_machine::FSMState::Running);
+        fsm.set_state(core_bot::state_machine::FSMState::Running);
         fsm.logger.info("[CV-Test] Starting CV diagnostics...");
 
         let mut capture = fsm.capture.lock().unwrap();
         if !capture.find_game_window() {
             fsm.logger.error("[CV-Test] Forza Horizon 6 window not found!");
-            fsm.set_state(crate::state_machine::FSMState::Idle);
+            fsm.set_state(core_bot::state_machine::FSMState::Idle);
             return;
         }
 
@@ -140,7 +131,7 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
             Some(f) => f,
             None => {
                 fsm.logger.error("[CV-Test] Failed to grab frame!");
-                fsm.set_state(crate::state_machine::FSMState::Idle);
+                fsm.set_state(core_bot::state_machine::FSMState::Idle);
                 return;
             }
         };
@@ -159,19 +150,19 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
         let scale = frame.height() as f32 / baseline_res.1 as f32;
 
         fsm.logger.info("[CV-Test] Checking screen state templates...");
-        let in_car_selection = crate::vision::is_on_screen(&frame, "car_selection_menu.png", 0.80, None, baseline_res);
+        let in_car_selection = core_bot::vision::is_on_screen(&frame, "car_selection_menu.png", 0.80, None, baseline_res);
         fsm.logger.info(&format!("  -> 'car_selection_menu.png' (threshold 0.80): {}", in_car_selection));
 
-        let brand_cursor = crate::vision::find_template(&frame, "brand_selection_cursor.png", 0.75, None, baseline_res);
+        let brand_cursor = core_bot::vision::find_template(&frame, "brand_selection_cursor.png", 0.75, None, baseline_res);
         fsm.logger.info(&format!("  -> 'brand_selection_cursor.png' (threshold 0.75): {:?}", brand_cursor));
 
-        let nissan_brand = crate::vision::find_template(&frame, "nissan_brand_big.png", 0.80, None, baseline_res);
+        let nissan_brand = core_bot::vision::find_template(&frame, "nissan_brand_big.png", 0.80, None, baseline_res);
         fsm.logger.info(&format!("  -> 'nissan_brand_big.png' (threshold 0.80): {:?}", nissan_brand));
 
-        let nissan_brand_selected = crate::vision::find_template(&frame, "nissan_brand_big_selected.png", 0.80, None, baseline_res);
+        let nissan_brand_selected = core_bot::vision::find_template(&frame, "nissan_brand_big_selected.png", 0.80, None, baseline_res);
         fsm.logger.info(&format!("  -> 'nissan_brand_big_selected.png' (threshold 0.80): {:?}", nissan_brand_selected));
 
-        let car_cursor = crate::vision::find_template(&frame, "car_selection_menu_selected.png", 0.80, None, baseline_res);
+        let car_cursor = core_bot::vision::find_template(&frame, "car_selection_menu_selected.png", 0.80, None, baseline_res);
         fsm.logger.info(&format!("  -> 'car_selection_menu_selected.png' (threshold 0.80): {:?}", car_cursor));
 
         // Create visual diagnostics overlay image
@@ -179,27 +170,27 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
         
         // Draw vertical grid boundary line at x = 500 (baseline)
         let grid_border_x = (500.0 * scale) as i32;
-        crate::stages::draw_line(&mut diag_frame, grid_border_x, 0, grid_border_x, frame.height() as i32 - 1, image::Rgb([128, 128, 128]));
+        core_bot::stages::draw_line(&mut diag_frame, grid_border_x, 0, grid_border_x, frame.height() as i32 - 1, image::Rgb([128, 128, 128]));
 
         // Draw car selection grid (3 rows x 4 columns)
         for r in 0..3 {
             for c in 0..4 {
-                let cell_cx = crate::vision::CAR_GRID_START_X + c as f32 * crate::vision::CAR_CELL_W;
-                let cell_cy = crate::vision::CAR_GRID_START_Y + r as f32 * crate::vision::CAR_CELL_H;
+                let cell_cx = core_bot::vision::CAR_GRID_START_X + c as f32 * core_bot::vision::CAR_CELL_W;
+                let cell_cy = core_bot::vision::CAR_GRID_START_Y + r as f32 * core_bot::vision::CAR_CELL_H;
 
                 let screen_cx = (cell_cx * scale) as i32;
                 let screen_cy = (cell_cy * scale) as i32;
 
-                let cell_w = (crate::vision::CAR_CELL_W * scale) as i32;
-                let cell_h = (crate::vision::CAR_CELL_H * scale) as i32;
+                let cell_w = (core_bot::vision::CAR_CELL_W * scale) as i32;
+                let cell_h = (core_bot::vision::CAR_CELL_H * scale) as i32;
 
                 let x1 = screen_cx - cell_w / 2;
                 let y1 = screen_cy - cell_h / 2;
 
                 // Draw cell box outline in blue
-                crate::stages::draw_rect(&mut diag_frame, x1, y1, cell_w, cell_h, image::Rgb([0, 80, 150]));
+                core_bot::stages::draw_rect(&mut diag_frame, x1, y1, cell_w, cell_h, image::Rgb([0, 80, 150]));
                 // Draw small cell center crosshair
-                crate::stages::draw_crosshair(&mut diag_frame, screen_cx, screen_cy, 5, image::Rgb([0, 80, 150]));
+                core_bot::stages::draw_crosshair(&mut diag_frame, screen_cx, screen_cy, 5, image::Rgb([0, 80, 150]));
             }
         }
 
@@ -210,7 +201,7 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
             let cursor_w = (406.0 * scale) as i32;
             let cursor_h = (340.0 * scale) as i32;
             // Green box highlight
-            crate::stages::draw_rect_thick(&mut diag_frame, cx_i, cy_i, cursor_w, cursor_h, 3, image::Rgb([0, 255, 0]));
+            core_bot::stages::draw_rect_thick(&mut diag_frame, cx_i, cy_i, cursor_w, cursor_h, 3, image::Rgb([0, 255, 0]));
         }
 
         let mut cursor_col = -1;
@@ -218,10 +209,10 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
         if let Some((cx, cy)) = car_cursor {
             let b_cx = cx as f32 / scale;
             let b_cy = cy as f32 / scale;
-            let cursor_center_x = b_cx + crate::vision::CAR_CURSOR_OFFSET_X;
-            let cursor_center_y = b_cy + crate::vision::CAR_CURSOR_OFFSET_Y;
-            cursor_col = ((cursor_center_x - crate::vision::CAR_GRID_START_X) / crate::vision::CAR_CELL_W).round() as i32;
-            cursor_row = ((cursor_center_y - crate::vision::CAR_GRID_START_Y) / crate::vision::CAR_CELL_H).round() as i32;
+            let cursor_center_x = b_cx + core_bot::vision::CAR_CURSOR_OFFSET_X;
+            let cursor_center_y = b_cy + core_bot::vision::CAR_CURSOR_OFFSET_Y;
+            cursor_col = ((cursor_center_x - core_bot::vision::CAR_GRID_START_X) / core_bot::vision::CAR_CELL_W).round() as i32;
+            cursor_row = ((cursor_center_y - core_bot::vision::CAR_GRID_START_Y) / core_bot::vision::CAR_CELL_H).round() as i32;
             fsm.logger.info(&format!("[CV-Test] Selection cursor detected at grid cell: col={}, row={}", cursor_col, cursor_row));
         } else {
             fsm.logger.info("[CV-Test] Selection cursor NOT detected on screen.");
@@ -232,25 +223,25 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
 
         for r in 0..3 {
             for c in 0..4 {
-                let cell_cx = crate::vision::CAR_GRID_START_X + c as f32 * crate::vision::CAR_CELL_W;
-                let cell_cy = crate::vision::CAR_GRID_START_Y + r as f32 * crate::vision::CAR_CELL_H;
-                let cell_rx = (cell_cx - crate::vision::CAR_CELL_W / 2.0).max(0.0) as i32;
-                let cell_ry = (cell_cy - crate::vision::CAR_CELL_H / 2.0).max(0.0) as i32;
-                let cell_rw = crate::vision::CAR_CELL_W as i32;
-                let cell_rh = crate::vision::CAR_CELL_H as i32;
+                let cell_cx = core_bot::vision::CAR_GRID_START_X + c as f32 * core_bot::vision::CAR_CELL_W;
+                let cell_cy = core_bot::vision::CAR_GRID_START_Y + r as f32 * core_bot::vision::CAR_CELL_H;
+                let cell_rx = (cell_cx - core_bot::vision::CAR_CELL_W / 2.0).max(0.0) as i32;
+                let cell_ry = (cell_cy - core_bot::vision::CAR_CELL_H / 2.0).max(0.0) as i32;
+                let cell_rw = core_bot::vision::CAR_CELL_W as i32;
+                let cell_rh = core_bot::vision::CAR_CELL_H as i32;
 
                 // Look for templates inside the cell bounds (down to 0.70 threshold for diagnostics)
-                let cell_matches = crate::vision::find_all_matches(&frame, "Nissan_1989.png", 0.70, Some((cell_rx, cell_ry, cell_rw, cell_rh)), baseline_res);
+                let cell_matches = core_bot::vision::find_all_matches(&frame, "Nissan_1989.png", 0.70, Some((cell_rx, cell_ry, cell_rw, cell_rh)), baseline_res);
 
                 if !cell_matches.is_empty() {
                     total_matches += 1;
                     let best_match = cell_matches.iter().max_by(|a, b| a.2.partial_cmp(&b.2).unwrap()).unwrap();
                     let (sx, sy, score) = *best_match;
 
-                    let is_favorite = crate::vision::is_on_screen(&frame, "car_favorite_heart.png", 0.80, Some((cell_rx, cell_ry, cell_rw, cell_rh)), baseline_res);
+                    let is_favorite = core_bot::vision::is_on_screen(&frame, "car_favorite_heart.png", 0.80, Some((cell_rx, cell_ry, cell_rw, cell_rh)), baseline_res);
 
                     // Draw matched car crosshair in bright red
-                    crate::stages::draw_crosshair(&mut diag_frame, sx as i32, sy as i32, 15, image::Rgb([255, 0, 0]));
+                    core_bot::stages::draw_crosshair(&mut diag_frame, sx as i32, sy as i32, 15, image::Rgb([255, 0, 0]));
 
                     // Draw favorite heart search bounding box (magenta if favorite, yellow if not)
                     let cell_rx_s = (cell_rx as f32 * scale) as i32;
@@ -258,7 +249,7 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
                     let cell_rw_s = (cell_rw as f32 * scale) as i32;
                     let cell_rh_s = (cell_rh as f32 * scale) as i32;
                     let fav_color = if is_favorite { image::Rgb([255, 0, 255]) } else { image::Rgb([255, 255, 0]) };
-                    crate::stages::draw_rect_thick(&mut diag_frame, cell_rx_s, cell_ry_s, cell_rw_s, cell_rh_s, 2, fav_color);
+                    core_bot::stages::draw_rect_thick(&mut diag_frame, cell_rx_s, cell_ry_s, cell_rw_s, cell_rh_s, 2, fav_color);
 
                     fsm.logger.info(&format!(
                         "  -> Cell (col={}, row={}) MATCHED S-Cargo: score={:.4} at x={}, y={} (favorite={})",
@@ -271,11 +262,11 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
                         fsm.logger.info(&format!(
                             "     Distance to cursor: cols_diff={}, rows_diff={}",
                             cols_diff, rows_diff
-                        ));
-                    }
-                }
-            }
-        }
+                           ));
+                       }
+                   }
+               }
+           }
         fsm.logger.info(&format!("[CV-Test] Cell scan complete. Found {} matched cells.", total_matches));
 
         // Save visual diagnostics image
@@ -287,7 +278,7 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
         }
 
         fsm.logger.info("[CV-Test] CV diagnostics completed.");
-        fsm.set_state(crate::state_machine::FSMState::Idle);
+        fsm.set_state(core_bot::state_machine::FSMState::Idle);
     });
 }
 
@@ -381,6 +372,14 @@ pub fn run() {
             app.manage(BotState(fsm));
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Ensure bot stops on window close
+                if let Some(bot_state) = window.try_state::<BotState>() {
+                    bot_state.0.stop();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             start_bot,
             stop_bot,
@@ -395,14 +394,6 @@ pub fn run() {
             check_vigem_status,
             start_vigem_install
         ])
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Ensure bot stops on window close
-                if let Some(bot_state) = window.try_state::<BotState>() {
-                    bot_state.0.stop();
-                }
-            }
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

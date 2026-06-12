@@ -650,6 +650,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-bot"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dxgi-capture-rs",
+ "image",
+ "imageproc",
+ "noise",
+ "rand 0.8.6",
+ "rand_distr",
+ "rsruckig",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tokio",
+ "uuid",
+ "vigem-client",
+ "windows 0.52.0",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1182,29 +1203,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fh6-wheelspin-farm-bot"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dxgi-capture-rs",
- "image",
- "imageproc",
- "noise",
- "rand 0.8.6",
- "rand_distr",
- "rsruckig",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tokio",
- "uuid",
- "vigem-client",
- "windows 0.52.0",
-]
-
-[[package]]
 name = "field-offset"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1282,6 +1280,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "free-bot"
+version = "0.1.0"
+dependencies = [
+ "core-bot",
+ "image",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "vigem-client",
 ]
 
 [[package]]

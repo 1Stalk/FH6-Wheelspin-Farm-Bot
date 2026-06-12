@@ -635,7 +635,7 @@ pub fn run_gamepad_test(ctx: &BotFSMContext) {
 // Drawing Utility Helpers
 // ---------------------------------------------------------------------------
 
-pub(crate) fn draw_line(img: &mut image::RgbImage, x1: i32, y1: i32, x2: i32, y2: i32, color: image::Rgb<u8>) {
+pub fn draw_line(img: &mut image::RgbImage, x1: i32, y1: i32, x2: i32, y2: i32, color: image::Rgb<u8>) {
     let dx = (x2 - x1).abs();
     let dy = (y2 - y1).abs();
     let sx = if x1 < x2 { 1 } else { -1 };
@@ -666,7 +666,7 @@ pub(crate) fn draw_line(img: &mut image::RgbImage, x1: i32, y1: i32, x2: i32, y2
     }
 }
 
-pub(crate) fn draw_rect(img: &mut image::RgbImage, x: i32, y: i32, w: i32, h: i32, color: image::Rgb<u8>) {
+pub fn draw_rect(img: &mut image::RgbImage, x: i32, y: i32, w: i32, h: i32, color: image::Rgb<u8>) {
     let x2 = x + w - 1;
     let y2 = y + h - 1;
     draw_line(img, x, y, x2, y, color);
@@ -675,13 +675,13 @@ pub(crate) fn draw_rect(img: &mut image::RgbImage, x: i32, y: i32, w: i32, h: i3
     draw_line(img, x2, y, x2, y2, color);
 }
 
-pub(crate) fn draw_rect_thick(img: &mut image::RgbImage, x: i32, y: i32, w: i32, h: i32, thickness: i32, color: image::Rgb<u8>) {
+pub fn draw_rect_thick(img: &mut image::RgbImage, x: i32, y: i32, w: i32, h: i32, thickness: i32, color: image::Rgb<u8>) {
     for t in 0..thickness {
         draw_rect(img, x + t, y + t, w - 2 * t, h - 2 * t, color);
     }
 }
 
-pub(crate) fn draw_crosshair(img: &mut image::RgbImage, cx: i32, cy: i32, size: i32, color: image::Rgb<u8>) {
+pub fn draw_crosshair(img: &mut image::RgbImage, cx: i32, cy: i32, size: i32, color: image::Rgb<u8>) {
     draw_line(img, cx - size, cy, cx + size, cy, color);
     draw_line(img, cx, cy - size, cx, cy + size, color);
 }
