@@ -499,6 +499,14 @@
 
     <!-- Footer -->
     <div class="modal-footer">
+      {#if !driverInstalled}
+        <button
+          class="action-btn cancel"
+          on:click={handleClose}
+        >
+          Close Setup
+        </button>
+      {/if}
       <button
         class="action-btn save"
         disabled={!driverInstalled || isChecking}
@@ -1121,6 +1129,7 @@
   .modal-footer {
     display: flex;
     justify-content: flex-end;
+    gap: 12px;
     padding: 14px 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(0, 0, 0, 0.25);
@@ -1135,6 +1144,18 @@
     transition: all 0.2s ease;
     padding: 8px 18px;
     cursor: pointer;
+  }
+
+  .action-btn.cancel {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .action-btn.cancel:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.35);
   }
 
   .action-btn.save {

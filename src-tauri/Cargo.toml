@@ -1,6 +1,6 @@
 [package]
 name = "free-bot"
-version = "1.0.0"
+version = "1.0.1"
 description = "FH6 Free Bot"
 authors = []
 edition = "2021"

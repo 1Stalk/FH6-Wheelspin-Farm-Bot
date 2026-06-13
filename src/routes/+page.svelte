@@ -663,7 +663,7 @@ import StartNoticeModal from "$lib/design/StartNoticeModal.svelte";
     <!-- Footer -->
     <div class="app-footer">
       <span class="footer-left">FH6 WHEELSPIN FARM BOT</span>
-      <span class="footer-right mono">v1.0.0 · FH6WheelspinFarmBot</span>
+      <span class="footer-right mono">v1.0.1 · FH6WheelspinFarmBot</span>
     </div>
   </div>
 
