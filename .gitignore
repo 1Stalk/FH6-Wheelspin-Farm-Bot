@@ -19,4 +19,6 @@ __pycache__
 scratch/
 build.ps1
 build.bat
+build-both.ps1
 FH6WheelSpinFarmBot.exe
+FH6WheelSpinFarmBot-Pro.exe
