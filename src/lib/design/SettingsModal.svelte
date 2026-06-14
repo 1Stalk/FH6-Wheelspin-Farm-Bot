@@ -232,7 +232,8 @@
           <div class="pro-features">
             <span>★ Custom Cars (Stage 1 & 2)</span>
             <span>★ Discord & Telegram Integration</span>
-            <span>★ Safe Auto-Updater</span>
+            <span>★ One-time purchase</span>
+            <span>★ Lifetime updates</span>
           </div>
         </div>
         <a href="https://ko-fi.com/s/6559bf5583" target="_blank" rel="noopener noreferrer" class="pro-buy-btn">

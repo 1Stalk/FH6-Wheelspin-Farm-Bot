@@ -272,7 +272,7 @@
     position: absolute;
     bottom: calc(100% - 4px); /* sits on top of the card top border */
     left: 20px; /* align with the left part of the card */
-    z-index: 1; /* behind the card */
+    z-index: 3; /* in front of the card */
     border: 3px solid #000000;
     border-bottom: none;
     border-radius: 8px 8px 0 0;
