@@ -218,7 +218,7 @@
                     >Custom Car option is only available in the Pro version.</span
                   >
                   <a
-                    href="https://ko-fi.com/stalkone"
+                    href="https://ko-fi.com/s/6559bf5583"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="pro-kofi-banner-link"
