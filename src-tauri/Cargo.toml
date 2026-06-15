@@ -1,6 +1,6 @@
 [package]
 name = "free-bot"
-version = "1.0.1"
+version = "1.1.0"
 description = "FH6 Free Bot"
 authors = ["1Stalk"]
 license = "MIT"
