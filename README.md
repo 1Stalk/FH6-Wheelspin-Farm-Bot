@@ -4,7 +4,7 @@
 
 A fully automated, 100% AFK bot for farming Super Wheelspins, Credits, and Skill Points in Forza Horizon 6.
 
-## The Auto-Farming Cycle
+## Auto-Farming Cycle
 
 The bot runs on a continuous, fully automated 4-stage loop that handles the entire farming process AFK, compiling the best legal farming methods discovered by the community to date:
 
@@ -22,12 +22,17 @@ The bot runs on a continuous, fully automated 4-stage loop that handles the enti
 └────────────────────────────────────┘      └────────────────────────────────────┘
 ```
 
+### Flexible Configuration & Error Recovery
+
+- **Customizable Stages**: Any stage of the cycle can be toggled on or off to suit your farming needs. For example, if you already have enough credits, you can skip the Colossus race (Stage 1) and focus entirely on obtaining Super Wheelspins.
+- **Error Recovery**: Bot is designed to handle common game issues automatically. Even for simple individual tasks like running the Colossus race, using the bot ensures that unexpected pop-ups (e.g., "controller disconnected", out-of-video-memory warnings, or random errors) are dismissed, allowing the bot to automatically resume the activity.
+
 ## Prerequisites
 
 To run the bot, your system needs the following components:
 
-* **WebView2 Runtime** (used for rendering the user interface)
-* **ViGEmBus Driver** (required for virtual controller emulation)
+- **WebView2 Runtime** (used for rendering the user interface)
+- **ViGEmBus Driver** (required for virtual controller emulation)
 
 > [!NOTE]
 > If either of these dependencies is missing, the bot will automatically detect it and prompt you to install them upon startup.
@@ -50,12 +55,12 @@ Using any bot violates the game's Terms of Service and carries a risk of suspens
 
 To minimize detection, the bot mimics human playstyles with advanced input simulation:
 
-* **Controller Emulation**: Emulates a real Xbox 360 controller via the ViGEmBus driver, making the bot appear as physical hardware rather than automated software.
-* **Human-like Timing**: Randomizes button holds and menu delays using human-like response distributions.
-* **Smooth Movements**: Uses the Ruckig library for smooth analog stick and trigger transitions instead of instant snaps.
-* **Micro-tremors**: Adds subtle, organic micro-vibrations to joysticks to simulate natural hand tremors.
-* **Overshooting & Corrections**: Simulates realistic human errors by occasionally overshooting targets slightly before correcting.
+- **Controller Emulation**: Emulates a real Xbox 360 controller via the ViGEmBus driver, making the bot appear as physical hardware rather than automated software.
+- **Human-like Timing**: Randomizes button holds and menu delays using human-like response distributions.
+- **Smooth Movements**: Uses the Ruckig library for smooth analog stick and trigger transitions instead of instant snaps.
+- **Micro-tremors**: Adds subtle, organic micro-vibrations to joysticks to simulate natural hand tremors.
+- **Overshooting & Corrections**: Simulates realistic human errors by occasionally overshooting targets slightly before correcting.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
