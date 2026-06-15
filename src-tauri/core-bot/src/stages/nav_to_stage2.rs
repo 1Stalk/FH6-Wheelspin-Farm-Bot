@@ -206,6 +206,8 @@ fn find_and_select_subaru_car(ctx: &BotFSMContext, scan_only: bool) -> bool {
             let cursor_col = ((cursor_center_x - crate::vision::CAR_GRID_START_X) / crate::vision::CAR_CELL_W).round() as i32;
             let cursor_row = ((cursor_center_y - crate::vision::CAR_GRID_START_Y) / crate::vision::CAR_CELL_H).round() as i32;
 
+            // Sort candidates by Manhattan-distance priority from cursor
+            candidates.sort_by_key(|c| ((c.0 as i32 - cursor_col).abs(), (c.1 as i32 - cursor_row).abs()));
             let target = candidates[0];
             let target_col = target.0;
             let target_row = target.1;

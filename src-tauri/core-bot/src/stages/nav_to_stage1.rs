@@ -307,7 +307,7 @@ fn find_and_select_car(
             let target = if let Some(fav) = candidates.iter().find(|&&(_, _, fav)| fav) {
                 fav
             } else {
-                candidates.sort_by_key(|c| (c.0, c.1));
+                candidates.sort_by_key(|c| ((c.0 as i32 - cursor_col).abs(), (c.1 as i32 - cursor_row).abs()));
                 &candidates[0]
             };
 

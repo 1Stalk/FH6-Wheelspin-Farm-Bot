@@ -394,7 +394,8 @@ fn find_and_select_new_car(ctx: &BotFSMContext) -> bool {
                 / crate::vision::CAR_CELL_H)
                 .round() as i32;
 
-            candidates.sort_by_key(|c| (c.0, c.1));
+            // Sort candidates by Manhattan-distance priority from cursor (same column first, then adjacent columns)
+            candidates.sort_by_key(|c| ((c.0 as i32 - cursor_col).abs(), (c.1 as i32 - cursor_row).abs()));
             let target = candidates[0];
             let target_col = target.0;
             let target_row = target.1;
@@ -978,6 +979,8 @@ fn find_and_select_player_subaru(ctx: &BotFSMContext) -> bool {
                 / crate::vision::CAR_CELL_H)
                 .round() as i32;
 
+            // Sort candidates by Manhattan-distance priority from cursor
+            candidates.sort_by_key(|c| ((c.0 as i32 - cursor_col).abs(), (c.1 as i32 - cursor_row).abs()));
             let target = candidates[0];
             let target_col = target.0;
             let target_row = target.1;
@@ -1127,6 +1130,8 @@ fn delete_used_subaru_cars(ctx: &BotFSMContext, count: usize) -> bool {
                     / crate::vision::CAR_CELL_H)
                     .round() as i32;
 
+                // Sort candidates by Manhattan-distance priority from cursor
+                candidates.sort_by_key(|c| ((c.0 as i32 - cursor_col).abs(), (c.1 as i32 - cursor_row).abs()));
                 let target = candidates[0];
                 let target_col = target.0;
                 let target_row = target.1;
