@@ -1175,6 +1175,36 @@ fn delete_used_subaru_cars(ctx: &BotFSMContext, count: usize) -> bool {
                     pad.sleep_responsive(0.300);
                 }
                 found = true;
+
+                // Wait for the car selection menu to reload and the selection cursor to appear
+                ctx.logger.info("[delete_used_subaru_cars] Waiting for menu to reload after deletion...");
+                let mut cursor_loaded = false;
+                for attempt in 1..=25 {
+                    if ctx.is_stop_requested.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(200));
+                    let frame_opt = {
+                        let mut capture = ctx.capture.lock().unwrap();
+                        capture.grab_frame()
+                    };
+                    if let Some(frame) = frame_opt {
+                        if find_template(ctx, &frame, "car_selection_menu_selected.png", 0.80, None).is_some() {
+                            cursor_loaded = true;
+                            ctx.logger.info(&format!(
+                                "[delete_used_subaru_cars] Menu reloaded (cursor found) at attempt {}.",
+                                attempt
+                            ));
+                            break;
+                        }
+                    }
+                }
+                if !cursor_loaded {
+                    ctx.logger.warn("[delete_used_subaru_cars] Timeout waiting for cursor after deletion.");
+                }
+                // Add a small extra sleep for stability
+                std::thread::sleep(Duration::from_millis(300));
+
                 break;
             }
 
