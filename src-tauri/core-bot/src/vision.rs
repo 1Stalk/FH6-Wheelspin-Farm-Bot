@@ -180,18 +180,66 @@ pub fn load_template_grayscale(name: &str) -> Option<GrayImage> {
     Some(dynamic_img.to_luma8())
 }
 
+use std::cell::RefCell;
+
+struct CachedGrayFrame {
+    rgb_ptr: usize,
+    width: u32,
+    height: u32,
+    fingerprint: [u8; 12],
+    gray: GrayImage,
+}
+
+thread_local! {
+    static GRAY_CACHE: RefCell<Option<CachedGrayFrame>> = RefCell::new(None);
+}
+
 // Convert RGB frame to Grayscale GrayImage
 pub fn rgb_to_grayscale(frame: &RgbImage) -> GrayImage {
-    let mut gray = GrayImage::new(frame.width(), frame.height());
-    for (x, y, pixel) in frame.enumerate_pixels() {
-        // Standard luma formula: Y = 0.299R + 0.587G + 0.114B
-        let r = pixel[0] as f32;
-        let g = pixel[1] as f32;
-        let b = pixel[2] as f32;
-        let luma = (0.299 * r + 0.587 * g + 0.114 * b) as u8;
-        gray.put_pixel(x, y, Luma([luma]));
+    let rgb_ptr = frame.as_raw().as_ptr() as usize;
+    let width = frame.width();
+    let height = frame.height();
+
+    // Grab first 4 pixels for fingerprint (if frame has at least 4 pixels)
+    let mut fingerprint = [0u8; 12];
+    let raw_bytes = frame.as_raw();
+    if raw_bytes.len() >= 12 {
+        fingerprint.copy_from_slice(&raw_bytes[0..12]);
     }
-    gray
+
+    GRAY_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(ref c) = *cache {
+            if c.rgb_ptr == rgb_ptr
+                && c.width == width
+                && c.height == height
+                && c.fingerprint == fingerprint
+            {
+                return c.gray.clone();
+            }
+        }
+
+        // Cache miss: convert full frame
+        let mut gray = GrayImage::new(width, height);
+        for (x, y, pixel) in frame.enumerate_pixels() {
+            // Standard luma formula: Y = 0.299R + 0.587G + 0.114B
+            let r = pixel[0] as f32;
+            let g = pixel[1] as f32;
+            let b = pixel[2] as f32;
+            let luma = (0.299 * r + 0.587 * g + 0.114 * b) as u8;
+            gray.put_pixel(x, y, Luma([luma]));
+        }
+
+        *cache = Some(CachedGrayFrame {
+            rgb_ptr,
+            width,
+            height,
+            fingerprint,
+            gray: gray.clone(),
+        });
+
+        gray
+    })
 }
 
 /// Grabs a region of interest (ROI) from a GrayImage.
@@ -296,6 +344,29 @@ fn find_template_ncc_impl(
     let frame_w = frame.width();
     let scale = frame_h as f32 / baseline_res.1 as f32;
 
+    let mut rx = 0;
+    let mut ry = 0;
+    let mut rw = frame_w;
+    let mut rh = frame_h;
+
+    if let Some((x, y, w, h)) = actual_region {
+        let mut scaled_x = (x as f32 * scale) as i32;
+        let mut scaled_y = (y as f32 * scale) as i32;
+        let mut scaled_w = (w as f32 * scale) as i32;
+        let mut scaled_h = (h as f32 * scale) as i32;
+
+        scaled_x = scaled_x.max(0).min(frame_w as i32 - 1);
+        scaled_y = scaled_y.max(0).min(frame_h as i32 - 1);
+        scaled_w = scaled_w.max(1).min(frame_w as i32 - scaled_x);
+        scaled_h = scaled_h.max(1).min(frame_h as i32 - scaled_y);
+
+        rx = scaled_x as u32;
+        ry = scaled_y as u32;
+        rw = scaled_w as u32;
+        rh = scaled_h as u32;
+    }
+
+    let search_area = crop_grayscale(&gray_frame, rx, ry, rw, rh);
     let mut matches = Vec::new();
 
     for cand in candidates {
@@ -316,43 +387,19 @@ fn find_template_ncc_impl(
             template
         };
 
-        let mut rx = 0;
-        let mut ry = 0;
-        let mut rw = frame_w;
-        let mut rh = frame_h;
-
-        if let Some((x, y, w, h)) = actual_region {
-            let mut scaled_x = (x as f32 * scale) as i32;
-            let mut scaled_y = (y as f32 * scale) as i32;
-            let mut scaled_w = (w as f32 * scale) as i32;
-            let mut scaled_h = (h as f32 * scale) as i32;
-
-            scaled_x = scaled_x.max(0).min(frame_w as i32 - 1);
-            scaled_y = scaled_y.max(0).min(frame_h as i32 - 1);
-            scaled_w = scaled_w.max(1).min(frame_w as i32 - scaled_x);
-            scaled_h = scaled_h.max(1).min(frame_h as i32 - scaled_y);
-
-            rx = scaled_x as u32;
-            ry = scaled_y as u32;
-            rw = scaled_w as u32;
-            rh = scaled_h as u32;
-        }
-
         let tw = scaled_template.width();
         let th = scaled_template.height();
         if rw < tw || rh < th {
             continue;
         }
 
-        let search_area = crop_grayscale(&gray_frame, rx, ry, rw, rh);
-
         // Determine downsample factor coarse_s
         let min_dim = tw.min(th);
-        let coarse_s = if min_dim >= 64 {
+        let coarse_s = if min_dim >= 40 {
             8
-        } else if min_dim >= 32 {
+        } else if min_dim >= 20 {
             4
-        } else if min_dim >= 16 {
+        } else if min_dim >= 10 {
             2
         } else {
             1
@@ -414,17 +461,22 @@ fn find_template_ncc_impl(
                 }
                 let dev_i = var_i.sqrt();
 
-                // Compute cross-correlation using direct raw buffer indexing
-                let mut sum_ti = 0.0f64;
-                for ty in 0..dth_usize {
-                    let search_offset = (y as usize + ty) * dsw_stride + x as usize;
-                    let temp_offset = ty * dtw_usize;
-                    for tx in 0..dtw_usize {
-                        let t_val = ds_temp_raw[temp_offset + tx] as f64;
-                        let i_val = ds_search_raw[search_offset + tx] as f64;
-                        sum_ti += t_val * i_val;
+                // Compute cross-correlation using direct raw pointer indexing and integer arithmetic
+                let mut sum_ti_u64 = 0u64;
+                unsafe {
+                    let search_ptr = ds_search_raw.as_ptr();
+                    let temp_ptr = ds_temp_raw.as_ptr();
+                    for ty in 0..dth_usize {
+                        let search_row_offset = (y as usize + ty) * dsw_stride + x as usize;
+                        let temp_row_offset = ty * dtw_usize;
+                        for tx in 0..dtw_usize {
+                            let t_val = *temp_ptr.add(temp_row_offset + tx) as u64;
+                            let i_val = *search_ptr.add(search_row_offset + tx) as u64;
+                            sum_ti_u64 += t_val * i_val;
+                        }
                     }
                 }
+                let sum_ti = sum_ti_u64 as f64;
 
                 let num = n * sum_ti - sum_t * sum_i;
                 let score = (num / (dev_t * dev_i)) as f32;
@@ -522,16 +574,21 @@ fn find_template_ncc_impl(
                     }
                     let dev_i = var_i.sqrt();
 
-                    let mut sum_ti = 0.0f64;
-                    for ty in 0..th_usize {
-                        let sa_row_offset = (ref_y as usize + ty) * sa_stride + ref_x as usize;
-                        let temp_row_offset = ty * tw_usize;
-                        for tx in 0..tw_usize {
-                            let i_val = search_raw[sa_row_offset + tx] as f64;
-                            let t_val = temp_raw[temp_row_offset + tx] as f64;
-                            sum_ti += t_val * i_val;
+                    let mut sum_ti_u64 = 0u64;
+                    unsafe {
+                        let search_ptr = search_raw.as_ptr();
+                        let temp_ptr = temp_raw.as_ptr();
+                        for ty in 0..th_usize {
+                            let sa_row_offset = (ref_y as usize + ty) * sa_stride + ref_x as usize;
+                            let temp_row_offset = ty * tw_usize;
+                            for tx in 0..tw_usize {
+                                let i_val = *search_ptr.add(sa_row_offset + tx) as u64;
+                                let t_val = *temp_ptr.add(temp_row_offset + tx) as u64;
+                                sum_ti_u64 += t_val * i_val;
+                            }
                         }
                     }
+                    let sum_ti = sum_ti_u64 as f64;
 
                     let num = n_full * sum_ti - sum_t_full * sum_i;
                     let score = (num / (dev_t_full * dev_i)) as f32;
