@@ -203,50 +203,32 @@ fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
         return true;
     }
 
-    // 4. Detect unselected logo and cursor
+    // 4. Detect Subaru logo and navigation offsets using new lime-pixel detector
     ctx.logger
-        .info("[select_subaru_brand] Searching for brand selection cursor and Subaru logo...");
-    let start_search = std::time::Instant::now();
-    let cursor_pos = find_template(ctx, &frame, "brand_selection_cursor.png", 0.80, None);
+        .info("[select_subaru_brand] Searching for Subaru logo and grid offsets...");
     let subaru_pos = find_template(ctx, &frame, "subaru_brand_big.png", 0.80, None);
-    ctx.logger.info(&format!(
-        "[select_subaru_brand] Grid search took {} ms. Cursor pos: {:?}, Subaru pos: {:?}",
-        start_search.elapsed().as_millis(),
-        cursor_pos,
-        subaru_pos
-    ));
-
-    let (cx, cy) = match (cursor_pos, subaru_pos) {
-        (Some(c), Some(s)) => (c, s),
-        _ => {
+    let (sx, sy) = match subaru_pos {
+        Some(s) => s,
+        None => {
             ctx.logger
-                .error("[select_subaru_brand] Could not find cursor and/or Subaru logo on screen.");
+                .error("[select_subaru_brand] Could not find Subaru logo on screen.");
             return false;
         }
     };
 
-    // 5. Convert to baseline resolution coordinates (2560x1440)
-    let baseline_res = ctx.config.lock().unwrap().baseline_resolution;
-    let scale = frame.height() as f32 / baseline_res.1 as f32;
-
-    let b_cx = cx.0 as f32 / scale;
-    let b_cy = cx.1 as f32 / scale;
-    let b_sx = cy.0 as f32 / scale;
-    let b_sy = cy.1 as f32 / scale;
-
-    let cursor_center_x = b_cx + 231.0;
-    let cursor_center_y = b_cy + 40.0;
-
-    let dx = b_sx - cursor_center_x;
-    let dy = b_sy - cursor_center_y;
-
-    // 6. Calculate grid index offsets
-    let cols_diff = (dx / 470.0).round() as i32;
-    let rows_diff = (dy / 70.0).round() as i32;
+    let offsets = crate::vision::calculate_brand_navigation_offsets(&frame, (sx, sy));
+    let (cols_diff, rows_diff) = match offsets {
+        Some(o) => o,
+        None => {
+            ctx.logger
+                .error("[select_subaru_brand] Could not detect active brand cursor using lime outline.");
+            return false;
+        }
+    };
 
     ctx.logger.info(&format!(
-        "[select_subaru_brand] Computed offset: cols_diff={}, rows_diff={} (dx={}, dy={})",
-        cols_diff, rows_diff, dx, dy
+        "[select_subaru_brand] Computed offset: cols_diff={}, rows_diff={}",
+        cols_diff, rows_diff
     ));
 
     drop(capture);

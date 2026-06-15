@@ -676,6 +676,80 @@ pub fn is_on_screen(
     find_template(frame, template_name, threshold, region, baseline_res).is_some()
 }
 
+pub fn find_brand_cursor_lime(frame: &RgbImage, scale: f32) -> Option<(i32, i32)> {
+    // Baseline (2560x1440) parameters:
+    let base_start_x = 330.0;
+    let base_start_y = 336.0;
+    let base_cell_w = 473.0;
+    let base_cell_h = 76.0;
+    let base_step_x = 469.33;
+    let base_step_y = 72.0;
+
+    let mut best_col = -1;
+    let mut best_row = -1;
+    let mut max_lime_count = 0;
+
+    for row in 0..12 {
+        for col in 0..4 {
+            let cell_min_x = ((base_start_x + col as f32 * base_step_x) * scale) as u32;
+            let cell_min_y = ((base_start_y + row as f32 * base_step_y) * scale) as u32;
+            let cell_max_x = (cell_min_x as f32 + base_cell_w * scale) as u32;
+            let cell_max_y = (cell_min_y as f32 + base_cell_h * scale) as u32;
+
+            // Offset search vertically to avoid the top UI strip (ends around y=333 on 1440p)
+            let y_start = cell_min_y + (4.0 * scale) as u32;
+            let y_end = cell_max_y + (4.0 * scale) as u32;
+            let x_start = cell_min_x.saturating_sub((4.0 * scale) as u32);
+            let x_end = cell_max_x + (4.0 * scale) as u32;
+
+            let mut lime_count = 0;
+            for y in y_start..y_end {
+                if y >= frame.height() { continue; }
+                for x in x_start..x_end {
+                    if x >= frame.width() { continue; }
+                    let px = frame.get_pixel(x, y);
+                    if crate::stages::is_lime_pixel(px[0], px[1], px[2]) {
+                        lime_count += 1;
+                    }
+                }
+            }
+
+            if lime_count > max_lime_count {
+                max_lime_count = lime_count;
+                best_col = col as i32;
+                best_row = row as i32;
+            }
+        }
+    }
+
+    // Threshold of lime pixels to confirm presence of the cursor (e.g. 100 pixels scaled)
+    let threshold = (100.0 * scale * scale) as u32;
+    if max_lime_count >= threshold {
+        Some((best_col, best_row))
+    } else {
+        None
+    }
+}
+
+pub fn calculate_brand_navigation_offsets(
+    frame: &RgbImage,
+    target_pos: (u32, u32),
+) -> Option<(i32, i32)> {
+    let scale = frame.height() as f32 / 1440.0;
+
+    let b_sx = target_pos.0 as f32 / scale;
+    let b_sy = target_pos.1 as f32 / scale;
+
+    // Target cell coordinates based on our calibrated parameters
+    let target_col = ((b_sx - 566.5) / 469.33).round().max(0.0).min(3.0) as i32;
+    let target_row = ((b_sy - 374.0) / 72.0).round().max(0.0).min(11.0) as i32;
+
+    // Detect the current brand cursor position using lime pixel density
+    let (cursor_col, cursor_row) = find_brand_cursor_lime(frame, scale)?;
+
+    Some((target_col - cursor_col, target_row - cursor_row))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,8 +822,294 @@ mod tests {
         }
         let dynamic_img = image::open(frame_path).expect("Failed to open live_frame.png");
         let rgb_frame = dynamic_img.to_rgb8();
-        println!("Running find_all_matches on live_frame...");
-        let res = find_all_matches(&rgb_frame, "Toyota_2019.png", 0.70, None, (2560, 1440));
-        println!("Result of find_all_matches: {:?}", res);
+        println!("Running find_all_matches for brand_selection_cursor...");
+        let res1 = find_all_matches(&rgb_frame, "brand_selection_cursor.png", 0.50, None, (2560, 1440));
+        println!("Result for brand_selection_cursor: {:?}", res1);
+
+        println!("Running find_all_matches for journal_brand_cursor...");
+        let res2 = find_all_matches(&rgb_frame, "journal_brand_cursor.png", 0.50, None, (2560, 1440));
+        println!("Result for journal_brand_cursor: {:?}", res2);
+    }
+
+    #[test]
+    fn test_calibrate_brand_grid() {
+        println!("Initializing ScreenCapture for brand grid calibration...");
+        let mut capture = crate::capture::ScreenCapture::new();
+        let found = capture.find_game_window();
+        println!("Game window 'Forza Horizon 6' found: {}", found);
+        if !found {
+            println!("Error: Game window 'Forza Horizon 6' is not running or not found.");
+            return;
+        }
+
+        println!("Focusing game window...");
+        capture.focus_game_window();
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let mut frame = None;
+        for attempt in 1..=15 {
+            if let Some(f) = capture.grab_frame() {
+                let cx = f.width() / 2;
+                let cy = f.height() / 2;
+                let p = f.get_pixel(cx, cy);
+                let p2 = f.get_pixel(cx.saturating_sub(100), cy.saturating_sub(100));
+                let p3 = f.get_pixel(cx.min(f.width() - 1), cy.min(f.height() - 1));
+                
+                // If any of these are not black (0,0,0), we captured the screen successfully!
+                if p[0] != 0 || p[1] != 0 || p[2] != 0 || p2[0] != 0 || p2[1] != 0 || p2[2] != 0 || p3[0] != 0 || p3[1] != 0 || p3[2] != 0 {
+                    frame = Some(f);
+                    println!("Successfully grabbed non-black frame on attempt {}", attempt);
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
+
+        let frame = match frame {
+            Some(f) => f,
+            None => {
+                println!("Error: Failed to grab a non-black frame after 15 attempts.");
+                return;
+            }
+        };
+
+        println!(
+            "Captured frame of size: {}x{}",
+            frame.width(),
+            frame.height()
+        );
+
+        let scratch_dir = std::path::Path::new("c:/Users/PC/Documents/FH6-Wheelspin-Farm-Bot/scratch");
+        if !scratch_dir.exists() {
+            let _ = std::fs::create_dir_all(scratch_dir);
+        }
+        let _ = frame.save(scratch_dir.join("live_frame.png"));
+        println!("Saved full frame to scratch/live_frame.png");
+
+        println!("Running template match for brand_selection_cursor...");
+        let scale = frame.height() as f32 / 1440.0;
+        let t_pos1 = find_template(&frame, "brand_selection_cursor.png", 0.70, None, (2560, 1440));
+        let t_pos2 = find_template(&frame, "journal_brand_cursor.png", 0.70, None, (2560, 1440));
+        println!("  - brand_selection_cursor.png: raw={:?}, scaled=({:?})", 
+                 t_pos1, t_pos1.map(|p| (p.0 as f32 / scale, p.1 as f32 / scale)));
+        println!("  - journal_brand_cursor.png: raw={:?}, scaled=({:?})", 
+                 t_pos2, t_pos2.map(|p| (p.0 as f32 / scale, p.1 as f32 / scale)));
+
+        let mut highlight_img = frame.clone();
+
+        // Baseline (2560x1440) parameters:
+        let base_start_x = 330.0;
+        let base_start_y = 336.0;
+        let base_cell_w = 473.0;
+        let base_cell_h = 76.0;
+        let base_step_x = 469.33;
+        let base_step_y = 72.0;
+
+        let scale = frame.height() as f32 / 1440.0;
+
+        // Scan all 48 cells for lime pixels
+        let mut cell_lime_counts = Vec::new();
+        let mut max_lime_count = 0;
+        let mut best_col = -1;
+        let mut best_row = -1;
+
+        for row in 0..12 {
+            for col in 0..4 {
+                let cell_min_x = ((base_start_x + col as f32 * base_step_x) * scale) as u32;
+                let cell_min_y = ((base_start_y + row as f32 * base_step_y) * scale) as u32;
+                let cell_max_x = (cell_min_x as f32 + base_cell_w * scale) as u32;
+                let cell_max_y = (cell_min_y as f32 + base_cell_h * scale) as u32;
+
+                // Adjust search area vertically to avoid the top UI strip (y=237..333)
+                // We offset by 4.0 scaled pixels to be below the strip safely
+                let y_start = cell_min_y + (4.0 * scale) as u32;
+                let y_end = cell_max_y + (4.0 * scale) as u32;
+                let x_start = cell_min_x.saturating_sub((4.0 * scale) as u32);
+                let x_end = cell_max_x + (4.0 * scale) as u32;
+
+                let mut lime_count = 0;
+                for y in y_start..y_end {
+                    if y >= frame.height() { continue; }
+                    for x in x_start..x_end {
+                        if x >= frame.width() { continue; }
+                        let px = frame.get_pixel(x, y);
+                        // Use the official is_lime_pixel from core-bot crate stages module!
+                        if crate::stages::is_lime_pixel(px[0], px[1], px[2]) {
+                            lime_count += 1;
+                        }
+                    }
+                }
+
+                cell_lime_counts.push((col, row, lime_count));
+                if lime_count > max_lime_count {
+                    max_lime_count = lime_count;
+                    best_col = col as i32;
+                    best_row = row as i32;
+                }
+            }
+        }
+
+        // Draw lime pixels in red on highlight_img for visualization
+        for y in 0..frame.height() {
+            for x in 0..frame.width() {
+                let px = frame.get_pixel(x, y);
+                if crate::stages::is_lime_pixel(px[0], px[1], px[2]) {
+                    highlight_img.put_pixel(x, y, image::Rgb([255, 0, 0]));
+                }
+            }
+        }
+
+        let _ = highlight_img.save(scratch_dir.join("highlighted_lime.png"));
+        println!("Saved highlighted mask to scratch/highlighted_lime.png");
+
+        println!("=== LIME DETECTION RESULTS ===");
+        if best_col != -1 && max_lime_count > 50 {
+            println!("DETECTION SUCCESS!");
+            println!("Selected Cell: Column {}, Row {}", best_col, best_row);
+            println!("Lime Pixel Count in Selected Cell: {}", max_lime_count);
+        } else {
+            println!("DETECTION FAILED: No cell has significant lime pixels (max count: {}).", max_lime_count);
+        }
+
+        // Print significant cells (count > 5) sorted by count descending
+        cell_lime_counts.sort_by(|a, b| b.2.cmp(&a.2));
+        println!("Top cells by lime pixel count:");
+        for (c, r, count) in cell_lime_counts.iter().take(5) {
+            if *count > 5 {
+                println!("  Cell (Col {}, Row {}): {} pixels", c, r, count);
+            }
+        }
+        println!("==============================");
+
+        // Draw the calibrated 4x12 grid overlay
+        let mut grid_img = frame.clone();
+        let border_color = image::Rgb([0, 0, 255]); // blue grid
+        let active_color = image::Rgb([255, 0, 0]); // red active cell
+
+        for row in 0..12 {
+            for col in 0..4 {
+                let cell_min_x = ((base_start_x + col as f32 * base_step_x) * scale) as u32;
+                let cell_min_y = ((base_start_y + row as f32 * base_step_y) * scale) as u32;
+                let cell_max_x = (cell_min_x as f32 + base_cell_w * scale) as u32;
+                let cell_max_y = (cell_min_y as f32 + base_cell_h * scale) as u32;
+
+                let color = if col as i32 == best_col && row as i32 == best_row {
+                    active_color
+                } else {
+                    border_color
+                };
+
+                // Draw a hollow rectangle for each cell
+                // We'll draw 2-pixel thick border for visibility
+                for thickness in 0..2 {
+                    let mx = cell_min_x.saturating_add(thickness);
+                    let my = cell_min_y.saturating_add(thickness);
+                    let rx = cell_max_x.saturating_sub(thickness);
+                    let ry = cell_max_y.saturating_sub(thickness);
+
+                    let w_img = grid_img.width();
+                    let h_img = grid_img.height();
+                    
+                    for x in mx..=rx {
+                        if x < w_img {
+                            if my < h_img { grid_img.put_pixel(x, my, color); }
+                            if ry < h_img { grid_img.put_pixel(x, ry, color); }
+                        }
+                    }
+                    for y in my..=ry {
+                        if y < h_img {
+                            if mx < w_img { grid_img.put_pixel(mx, y, color); }
+                            if rx < w_img { grid_img.put_pixel(rx, y, color); }
+                        }
+                    }
+                }
+            }
+        }
+
+        let out_grid_path = std::path::Path::new("c:/Users/PC/Documents/FH6-Wheelspin-Farm-Bot/src-tauri/scratch/grid_overlay.png");
+        let _ = grid_img.save(&out_grid_path);
+        println!("Saved grid overlay image (with red active cell) to: {:?}", out_grid_path);
+    }
+
+    #[test]
+    fn test_live_subaru_navigation_path() {
+        println!("Initializing ScreenCapture for live Subaru navigation test...");
+        let mut capture = crate::capture::ScreenCapture::new();
+        let found = capture.find_game_window();
+        println!("Game window 'Forza Horizon 6' found: {}", found);
+        if !found {
+            println!("Error: Game window 'Forza Horizon 6' is not running or not found.");
+            return;
+        }
+
+        // Focus window and grab frame
+        capture.focus_game_window();
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let mut frame = None;
+        for attempt in 1..=10 {
+            if let Some(f) = capture.grab_frame() {
+                let cx = f.width() / 2;
+                let cy = f.height() / 2;
+                let p = f.get_pixel(cx, cy);
+                if p[0] != 0 || p[1] != 0 || p[2] != 0 {
+                    frame = Some(f);
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+
+        let frame = match frame {
+            Some(f) => f,
+            None => {
+                println!("Error: Failed to grab a non-black frame.");
+                return;
+            }
+        };
+
+        let baseline_res = (2560, 1440);
+        let scale = frame.height() as f32 / baseline_res.1 as f32;
+
+        // 1. Search for Subaru template
+        println!("Searching for template 'journal_subaru_brand.png'...");
+        let subaru_pos = find_template(&frame, "journal_subaru_brand.png", 0.70, None, baseline_res);
+        println!("  Template match result: {:?}", subaru_pos);
+
+        let (sx, sy) = match subaru_pos {
+            Some(s) => s,
+            None => {
+                println!("Error: 'journal_subaru_brand.png' not found on the screen. Verify it's visible.");
+                return;
+            }
+        };
+
+        // 2. Search for active brand cursor using lime outline
+        println!("Detecting current brand selection cursor (lime pixel scanner)...");
+        let cursor_cell = find_brand_cursor_lime(&frame, scale);
+        println!("  Cursor cell result: {:?}", cursor_cell);
+
+        let (cursor_col, cursor_row) = match cursor_cell {
+            Some(c) => c,
+            None => {
+                println!("Error: Active cursor not found using lime pixel outline.");
+                return;
+            }
+        };
+
+        // 3. Compute target cell
+        let b_sx = sx as f32 / scale;
+        let b_sy = sy as f32 / scale;
+        let target_col = ((b_sx - 566.5) / 469.33).round().max(0.0).min(3.0) as i32;
+        let target_row = ((b_sy - 374.0) / 72.0).round().max(0.0).min(11.0) as i32;
+
+        println!("=== NAVIGATION PATH CALCULATION ===");
+        println!("Detected Current Cursor: Column {}, Row {}", cursor_col, cursor_row);
+        println!("Target Brand Cell (Subaru): Column {}, Row {}", target_col, target_row);
+        println!("Navigation Required:");
+        println!("  Columns diff: {}", target_col - cursor_col);
+        println!("  Rows diff: {}", target_row - cursor_row);
+        println!("===================================");
     }
 }
+

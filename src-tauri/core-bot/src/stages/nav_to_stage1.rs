@@ -137,46 +137,24 @@ fn select_brand_filter(
         return true;
     }
 
-    // 4. Detect unselected logo and cursor
-    let cursor_pos = find_template(ctx, &frame, "brand_selection_cursor.png", 0.75, None);
+    // 4. Detect target logo and navigation offsets using new lime-pixel detector
     let brand_pos = find_template(ctx, &frame, brand_big, 0.80, None);
-
-    ctx.logger.info(&format!(
-        "  [select_brand_filter] Cursor: {:?}, Brand: {:?}",
-        cursor_pos, brand_pos
-    ));
-
-    let (cx, cy) = match (cursor_pos, brand_pos) {
-        (Some(c), Some(b)) => (c, b),
-        _ => {
-            ctx.logger.error(&format!(
-                "Failed to find templates on screen. Cursor: {}, Brand: {}",
-                cursor_pos.is_some(),
-                brand_pos.is_some()
-            ));
+    let (sx, sy) = match brand_pos {
+        Some(b) => b,
+        None => {
+            ctx.logger.error("Failed to find brand template on screen.");
             return false;
         }
     };
 
-    // 5. Convert to baseline resolution coordinates (2560x1440)
-    let baseline_res = ctx.config.lock().unwrap().baseline_resolution;
-    let scale = frame.height() as f32 / baseline_res.1 as f32;
-
-    let b_cx = cx.0 as f32 / scale;
-    let b_cy = cx.1 as f32 / scale;
-    let b_sx = cy.0 as f32 / scale;
-    let b_sy = cy.1 as f32 / scale;
-
-    // Align cursor corner coordinates to cell center coordinates
-    let cursor_center_x = b_cx + 231.0;
-    let cursor_center_y = b_cy + 40.0;
-
-    let dx = b_sx - cursor_center_x;
-    let dy = b_sy - cursor_center_y;
-
-    // 6. Calculate grid index offsets
-    let cols_diff = (dx / 470.0).round() as i32;
-    let rows_diff = (dy / 70.0).round() as i32;
+    let offsets = crate::vision::calculate_brand_navigation_offsets(&frame, (sx, sy));
+    let (cols_diff, rows_diff) = match offsets {
+        Some(o) => o,
+        None => {
+            ctx.logger.error("Failed to detect active brand cursor using lime outline.");
+            return false;
+        }
+    };
 
     // 7. Move cursor to the target logo and confirm
     let mut pad = ctx.pad.lock().unwrap();

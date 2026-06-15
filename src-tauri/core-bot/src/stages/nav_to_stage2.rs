@@ -91,34 +91,18 @@ fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
         return true;
     }
 
-    // 4. Detect unselected logo and cursor
-    let cursor_pos = find_template(ctx, &frame, "brand_selection_cursor.png", 0.75, None);
+    // 4. Detect Subaru logo and navigation offsets using new lime-pixel detector
     let subaru_pos = find_template(ctx, &frame, "subaru_brand_big.png", 0.75, None);
-
-    let (cx, cy) = match (cursor_pos, subaru_pos) {
-        (Some(c), Some(s)) => (c, s),
-        _ => return false,
+    let (sx, sy) = match subaru_pos {
+        Some(s) => s,
+        None => return false,
     };
 
-    // 5. Convert to baseline resolution coordinates (2560x1440)
-    let baseline_res = ctx.config.lock().unwrap().baseline_resolution;
-    let scale = frame.height() as f32 / baseline_res.1 as f32;
-
-    let b_cx = cx.0 as f32 / scale;
-    let b_cy = cx.1 as f32 / scale;
-    let b_sx = cy.0 as f32 / scale;
-    let b_sy = cy.1 as f32 / scale;
-
-    // Align cursor corner coordinates to cell center coordinates
-    let cursor_center_x = b_cx + 231.0;
-    let cursor_center_y = b_cy + 40.0;
-
-    let dx = b_sx - cursor_center_x;
-    let dy = b_sy - cursor_center_y;
-
-    // 6. Calculate grid index offsets
-    let cols_diff = (dx / 470.0).round() as i32;
-    let rows_diff = (dy / 70.0).round() as i32;
+    let offsets = crate::vision::calculate_brand_navigation_offsets(&frame, (sx, sy));
+    let (cols_diff, rows_diff) = match offsets {
+        Some(o) => o,
+        None => return false,
+    };
 
     drop(capture);
     // 7. Move cursor to the target logo and confirm
