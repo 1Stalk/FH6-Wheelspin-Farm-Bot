@@ -274,8 +274,18 @@ fn run_purchase_sequence(ctx: &BotFSMContext, num_to_buy: usize) -> bool {
         if let Some(frame) = capture.grab_frame() {
             if is_on_screen(ctx, &frame, "error.png", 0.95, None) {
                 ctx.logger
-                    .error("Out of credits! 'error.png' template detected. Stopping bot.");
-                return false;
+                    .info("Out of credits! 'error.png' template detected. Ending stage 3 purchases early (success).");
+                drop(capture);
+
+                // Dismiss the error dialog and return to the main menu
+                {
+                    let mut pad = ctx.pad.lock().unwrap();
+                    pad.press_b(); // Dismiss error dialog
+                    pad.sleep_responsive(1.000);
+                    pad.press_b(); // Exit the purchase details card/menu back to Subaru grid
+                    pad.sleep_responsive(1.000);
+                }
+                break;
             }
         }
         drop(capture);
