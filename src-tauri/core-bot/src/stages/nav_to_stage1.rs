@@ -256,7 +256,7 @@ fn find_and_select_car(
                     ctx,
                     &frame,
                     car_template,
-                    0.92,
+                    0.85,
                     Some((cell_rx, cell_ry, cell_rw, cell_rh)),
                 );
                 if is_car {

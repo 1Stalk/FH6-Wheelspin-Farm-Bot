@@ -937,7 +937,7 @@ fn find_and_select_player_subaru(ctx: &BotFSMContext) -> bool {
                     ctx,
                     &frame,
                     "subaru_impreza_1998.png",
-                    0.92,
+                    0.85,
                     Some((cell_rx, cell_ry, cell_rw, cell_rh)),
                 );
                 if is_car {

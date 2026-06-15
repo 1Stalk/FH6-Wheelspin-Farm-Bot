@@ -144,7 +144,6 @@
         </div>
       </div>
 
-      <!-- Test buttons section (Commented out per user request)
       <div class="settings-section">
         <div class="section-header">
           <span>TEST CONTROLS (NAV MODULES)</span>
@@ -195,7 +194,6 @@
         </div>
 
       </div>
-      -->
 
       <!-- Smart Settings section -->
       <div class="settings-section">

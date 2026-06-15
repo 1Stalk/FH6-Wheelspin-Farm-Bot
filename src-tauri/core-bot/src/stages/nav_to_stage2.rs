@@ -176,7 +176,7 @@ fn find_and_select_subaru_car(ctx: &BotFSMContext, scan_only: bool) -> bool {
                 let cell_rw = crate::vision::CAR_CELL_W as i32;
                 let cell_rh = crate::vision::CAR_CELL_H as i32;
 
-                let is_car = is_on_screen(ctx, &frame, "subaru_impreza_1998.png", 0.92, Some((cell_rx, cell_ry, cell_rw, cell_rh)));
+                let is_car = is_on_screen(ctx, &frame, "subaru_impreza_1998.png", 0.85, Some((cell_rx, cell_ry, cell_rw, cell_rh)));
                 if is_car {
                     let is_class_b = is_on_screen(ctx, &frame, "car_class_b.png", 0.80, Some((cell_rx, cell_ry, cell_rw, cell_rh)));
                     if !is_class_b {

@@ -156,12 +156,6 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
         let brand_cursor = core_bot::vision::find_template(&frame, "brand_selection_cursor.png", 0.75, None, baseline_res);
         fsm.logger.info(&format!("  -> 'brand_selection_cursor.png' (threshold 0.75): {:?}", brand_cursor));
 
-        let nissan_brand = core_bot::vision::find_template(&frame, "nissan_brand_big.png", 0.80, None, baseline_res);
-        fsm.logger.info(&format!("  -> 'nissan_brand_big.png' (threshold 0.80): {:?}", nissan_brand));
-
-        let nissan_brand_selected = core_bot::vision::find_template(&frame, "nissan_brand_big_selected.png", 0.80, None, baseline_res);
-        fsm.logger.info(&format!("  -> 'nissan_brand_big_selected.png' (threshold 0.80): {:?}", nissan_brand_selected));
-
         let car_cursor = core_bot::vision::find_template(&frame, "car_selection_menu_selected.png", 0.80, None, baseline_res);
         fsm.logger.info(&format!("  -> 'car_selection_menu_selected.png' (threshold 0.80): {:?}", car_cursor));
 
@@ -218,9 +212,26 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
             fsm.logger.info("[CV-Test] Selection cursor NOT detected on screen.");
         }
 
-        fsm.logger.info("[CV-Test] Scanning all 12 grid cells for Nissan S-Cargo matches...");
-        let mut total_matches = 0;
+        #[derive(Clone)]
+        struct DetectedCar {
+            col: i32,
+            row: i32,
+            name: &'static str,
+            is_favorite: bool,
+            score: f32,
+            cell_cx: f32,
+            cell_cy: f32,
+        }
 
+        let templates = vec![
+            ("Toyota_2019.png", "Toyota Tacoma"),
+            ("Nissan_1989.png", "Nissan S-Cargo"),
+            ("subaru_impreza_1998.png", "Subaru Impreza"),
+        ];
+
+        let mut candidates = Vec::new();
+
+        fsm.logger.info("[CV-Test] Scanning all 12 grid cells for car matches...");
         for r in 0..3 {
             for c in 0..4 {
                 let cell_cx = core_bot::vision::CAR_GRID_START_X + c as f32 * core_bot::vision::CAR_CELL_W;
@@ -230,44 +241,159 @@ fn run_cv_diagnostics(state: tauri::State<'_, BotState>) {
                 let cell_rw = core_bot::vision::CAR_CELL_W as i32;
                 let cell_rh = core_bot::vision::CAR_CELL_H as i32;
 
-                // Look for templates inside the cell bounds (down to 0.70 threshold for diagnostics)
-                let cell_matches = core_bot::vision::find_all_matches(&frame, "Nissan_1989.png", 0.70, Some((cell_rx, cell_ry, cell_rw, cell_rh)), baseline_res);
+                // Check for favorite heart (using threshold 0.90 as in stage 1)
+                let is_favorite = core_bot::vision::is_on_screen(
+                    &frame,
+                    "car_favorite_heart.png",
+                    0.90,
+                    Some((cell_rx, cell_ry, cell_rw, cell_rh)),
+                    baseline_res,
+                );
 
-                if !cell_matches.is_empty() {
-                    total_matches += 1;
-                    let best_match = cell_matches.iter().max_by(|a, b| a.2.partial_cmp(&b.2).unwrap()).unwrap();
-                    let (sx, sy, score) = *best_match;
+                // Check for class B (used for Subaru check)
+                let is_class_b = core_bot::vision::is_on_screen(
+                    &frame,
+                    "car_class_b.png",
+                    0.80,
+                    Some((cell_rx, cell_ry, cell_rw, cell_rh)),
+                    baseline_res,
+                );
 
-                    let is_favorite = core_bot::vision::is_on_screen(&frame, "car_favorite_heart.png", 0.80, Some((cell_rx, cell_ry, cell_rw, cell_rh)), baseline_res);
+                for &(tpl, name) in &templates {
+                    let cell_matches = core_bot::vision::find_all_matches(
+                        &frame,
+                        tpl,
+                        0.70, // Scan down to 0.70 to log close hits
+                        Some((cell_rx, cell_ry, cell_rw, cell_rh)),
+                        baseline_res,
+                    );
 
-                    // Draw matched car crosshair in bright red
-                    core_bot::stages::draw_crosshair(&mut diag_frame, sx as i32, sy as i32, 15, image::Rgb([255, 0, 0]));
+                    if !cell_matches.is_empty() {
+                        let best_match = cell_matches
+                            .iter()
+                            .max_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
+                            .unwrap();
+                        let (mx, my, score) = *best_match;
 
-                    // Draw favorite heart search bounding box (magenta if favorite, yellow if not)
-                    let cell_rx_s = (cell_rx as f32 * scale) as i32;
-                    let cell_ry_s = (cell_ry as f32 * scale) as i32;
-                    let cell_rw_s = (cell_rw as f32 * scale) as i32;
-                    let cell_rh_s = (cell_rh as f32 * scale) as i32;
-                    let fav_color = if is_favorite { image::Rgb([255, 0, 255]) } else { image::Rgb([255, 255, 0]) };
-                    core_bot::stages::draw_rect_thick(&mut diag_frame, cell_rx_s, cell_ry_s, cell_rw_s, cell_rh_s, 2, fav_color);
-
-                    fsm.logger.info(&format!(
-                        "  -> Cell (col={}, row={}) MATCHED S-Cargo: score={:.4} at x={}, y={} (favorite={})",
-                        c, r, score, sx, sy, is_favorite
-                    ));
-
-                    if cursor_col >= 0 && cursor_row >= 0 {
-                        let cols_diff = c as i32 - cursor_col;
-                        let rows_diff = r as i32 - cursor_row;
                         fsm.logger.info(&format!(
-                            "     Distance to cursor: cols_diff={}, rows_diff={}",
-                            cols_diff, rows_diff
-                           ));
-                       }
-                   }
-               }
-           }
-        fsm.logger.info(&format!("[CV-Test] Cell scan complete. Found {} matched cells.", total_matches));
+                            "  -> Cell (col={}, row={}) MATCHED {}: score={:.4} at x={}, y={}, favorite={}, class_b={}",
+                            c, r, name, score, mx, my, is_favorite, is_class_b
+                        ));
+
+                        // Qualifies if score >= 0.85, and for Subaru: not class B
+                        let passes_threshold = score >= 0.85;
+                        let is_valid_candidate = if tpl == "subaru_impreza_1998.png" {
+                            passes_threshold && !is_class_b
+                        } else {
+                            passes_threshold
+                        };
+
+                        if is_valid_candidate {
+                            candidates.push(DetectedCar {
+                                col: c as i32,
+                                row: r as i32,
+                                name,
+                                is_favorite,
+                                score,
+                                cell_cx,
+                                cell_cy,
+                            });
+
+                            // Draw crosshair at match in template-specific color
+                            let match_color = match tpl {
+                                "Toyota_2019.png" => image::Rgb([240, 168, 74]), // Orange
+                                "subaru_impreza_1998.png" => image::Rgb([254, 2, 136]), // Pink
+                                _ => image::Rgb([44, 188, 164]), // Teal (Nissan)
+                            };
+                            core_bot::stages::draw_crosshair(&mut diag_frame, mx as i32, my as i32, 15, match_color);
+
+                            // Draw favorite bounding box in Magenta, or general detection in Yellow
+                            let cell_rx_s = (cell_rx as f32 * scale) as i32;
+                            let cell_ry_s = (cell_ry as f32 * scale) as i32;
+                            let cell_rw_s = (cell_rw as f32 * scale) as i32;
+                            let cell_rh_s = (cell_rh as f32 * scale) as i32;
+                            let rect_color = if is_favorite { image::Rgb([255, 0, 255]) } else { match_color };
+                            core_bot::stages::draw_rect_thick(&mut diag_frame, cell_rx_s, cell_ry_s, cell_rw_s, cell_rh_s, 2, rect_color);
+                        }
+                    }
+                }
+            }
+        }
+
+        fsm.logger.info(&format!("[CV-Test] Cell scan complete. Found {} valid car candidates.", candidates.len()));
+
+        // Emulate navigation priority
+        if !candidates.is_empty() && cursor_col >= 0 && cursor_row >= 0 {
+            // Emulate selection logic
+            let target_car = if let Some(fav) = candidates.iter().find(|c| c.is_favorite && c.name != "Subaru Impreza") {
+                Some(fav.clone())
+            } else {
+                // Otherwise, pick the closest candidate by Manhattan distance
+                let mut sorted = candidates.clone();
+                sorted.sort_by_key(|c| (c.col - cursor_col).abs() + (c.row - cursor_row).abs());
+                Some(sorted[0].clone())
+            };
+
+            if let Some(target) = target_car {
+                let cols_diff = target.col - cursor_col;
+                let rows_diff = target.row - cursor_row;
+
+                let mut moves = Vec::new();
+                if cols_diff > 0 {
+                    moves.push(format!("DPAD_RIGHT x {}", cols_diff));
+                } else if cols_diff < 0 {
+                    moves.push(format!("DPAD_LEFT x {}", cols_diff.abs()));
+                }
+                if rows_diff > 0 {
+                    moves.push(format!("DPAD_DOWN x {}", rows_diff));
+                } else if rows_diff < 0 {
+                    moves.push(format!("DPAD_UP x {}", rows_diff.abs()));
+                }
+
+                let moves_str = if moves.is_empty() {
+                    "None (already on target)".to_string()
+                } else {
+                    moves.join(", ")
+                };
+
+                fsm.logger.info(&format!(
+                    "[CV-Test] SIMULATED SELECTION for {}:",
+                    target.name
+                ));
+                fsm.logger.info(&format!(
+                    "  -> Start: cursor at col={}, row={}",
+                    cursor_col, cursor_row
+                ));
+                fsm.logger.info(&format!(
+                    "  -> Target: {} at col={}, row={}, score={:.4} (favorite={})",
+                    target.name, target.col, target.row, target.score, target.is_favorite
+                ));
+                fsm.logger.info(&format!(
+                    "  -> Emulated navigation inputs: {}, then press A",
+                    moves_str
+                ));
+
+                // Draw navigation path line on the diagnostics image
+                if let Some(cursor_pos) = car_cursor {
+                    let b_cx = cursor_pos.0 as f32 / scale;
+                    let b_cy = cursor_pos.1 as f32 / scale;
+                    let cursor_center_x = b_cx + core_bot::vision::CAR_CURSOR_OFFSET_X;
+                    let cursor_center_y = b_cy + core_bot::vision::CAR_CURSOR_OFFSET_Y;
+
+                    let start_x = (cursor_center_x * scale) as i32;
+                    let start_y = (cursor_center_y * scale) as i32;
+                    let end_x = (target.cell_cx * scale) as i32;
+                    let end_y = (target.cell_cy * scale) as i32;
+
+                    // Draw solid bright green line
+                    core_bot::stages::draw_line(&mut diag_frame, start_x, start_y, end_x, end_y, image::Rgb([0, 255, 0]));
+                    // Draw target crosshair
+                    core_bot::stages::draw_crosshair(&mut diag_frame, end_x, end_y, 10, image::Rgb([0, 255, 0]));
+                }
+            }
+        } else {
+            fsm.logger.info("[CV-Test] Emulated selection skipped: either cursor or candidates not detected.");
+        }
 
         // Save visual diagnostics image
         let diag_grid_path = scratch_dir.join("car_diagnostics_grid.png");
