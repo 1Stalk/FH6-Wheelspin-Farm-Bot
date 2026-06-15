@@ -71,7 +71,7 @@ fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
     {
         let mut pad = ctx.pad.lock().unwrap();
         pad.press_dpad_up();
-        pad.sleep_responsive(0.500);
+        pad.sleep_responsive(1.000);
     }
 
     // Grab frame after scrolling

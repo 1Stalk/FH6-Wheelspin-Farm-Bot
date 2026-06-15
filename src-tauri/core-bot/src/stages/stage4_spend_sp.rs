@@ -156,7 +156,7 @@ fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
     {
         let mut pad = ctx.pad.lock().unwrap();
         pad.press_dpad_up();
-        pad.sleep_responsive(0.400);
+        pad.sleep_responsive(1.000);
     }
     ctx.logger.info(&format!(
         "[select_subaru_brand] DPAD UP press + sleep took {} ms. Grabbing frame...",
