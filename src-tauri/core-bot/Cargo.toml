@@ -1,7 +1,8 @@
 [package]
 name = "core-bot"
 version = "1.0.1"
-authors = []
+authors = ["1Stalk"]
+license = "MIT"
 edition = "2021"
 
 [lib]

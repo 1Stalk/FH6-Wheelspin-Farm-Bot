@@ -55,3 +55,7 @@ To minimize detection, the bot mimics human playstyles with advanced input simul
 * **Smooth Movements**: Uses the Ruckig library for smooth analog stick and trigger transitions instead of instant snaps.
 * **Micro-tremors**: Adds subtle, organic micro-vibrations to joysticks to simulate natural hand tremors.
 * **Overshooting & Corrections**: Simulates realistic human errors by occasionally overshooting targets slightly before correcting.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
