@@ -346,7 +346,7 @@ fn find_and_select_new_car(ctx: &BotFSMContext) -> bool {
                         ctx,
                         &frame,
                         "car_favorite_heart.png",
-                        0.80,
+                        0.90,
                         Some((cell_rx, cell_ry, cell_rw, cell_rh)),
                     );
                     let is_class_b = is_on_screen(
@@ -1087,7 +1087,7 @@ fn delete_used_subaru_cars(ctx: &BotFSMContext, count: usize) -> bool {
                             ctx,
                             &frame,
                             "car_favorite_heart.png",
-                            0.80,
+                            0.90,
                             Some((cell_rx, cell_ry, cell_rw, cell_rh)),
                         );
                         let is_class_b = is_on_screen(

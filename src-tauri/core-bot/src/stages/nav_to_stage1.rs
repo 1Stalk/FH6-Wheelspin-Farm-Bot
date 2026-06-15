@@ -264,7 +264,7 @@ fn find_and_select_car(
                         ctx,
                         &frame,
                         "car_favorite_heart.png",
-                        0.80,
+                        0.90,
                         Some((cell_rx, cell_ry, cell_rw, cell_rh)),
                     );
                     candidates.push((c, r, is_favorite));
