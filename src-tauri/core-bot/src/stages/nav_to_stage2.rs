@@ -143,13 +143,13 @@ fn find_and_select_subaru_car(ctx: &BotFSMContext, scan_only: bool) -> bool {
             }
         };
 
-        // Find selection cursor
-        let cursor_pos = find_template(ctx, &frame, "car_selection_menu_selected.png", 0.80, None);
-
-        // Scan all 12 cells for candidates
         let baseline_res = ctx.config.lock().unwrap().baseline_resolution;
         let scale = frame.height() as f32 / baseline_res.1 as f32;
 
+        // Find selection cursor using lime outline
+        let cursor_pos = crate::vision::find_car_cursor_lime(&frame, scale);
+
+        // Scan all 12 cells for candidates
         let mut candidates = Vec::new();
         for r in 0..3 {
             for c in 0..4 {
@@ -181,14 +181,7 @@ fn find_and_select_subaru_car(ctx: &BotFSMContext, scan_only: bool) -> bool {
                 continue;
             }
 
-            let (cx, cy) = cursor_pos.unwrap();
-            let b_cx = cx as f32 / scale;
-            let b_cy = cy as f32 / scale;
-            let cursor_center_x = b_cx + crate::vision::CAR_CURSOR_OFFSET_X;
-            let cursor_center_y = b_cy + crate::vision::CAR_CURSOR_OFFSET_Y;
-
-            let cursor_col = ((cursor_center_x - crate::vision::CAR_GRID_START_X) / crate::vision::CAR_CELL_W).round() as i32;
-            let cursor_row = ((cursor_center_y - crate::vision::CAR_GRID_START_Y) / crate::vision::CAR_CELL_H).round() as i32;
+            let (cursor_col, cursor_row) = cursor_pos.unwrap();
 
             // Sort candidates by Manhattan-distance priority from cursor
             candidates.sort_by_key(|c| ((c.0 as i32 - cursor_col).abs(), (c.1 as i32 - cursor_row).abs()));
