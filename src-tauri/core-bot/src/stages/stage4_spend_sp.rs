@@ -1180,7 +1180,9 @@ fn run_garage_cleanup(ctx: &BotFSMContext, count: usize, last_iteration_success:
         pad.press_b();
         pad.sleep_responsive(1.000);
         pad.press_dpad_up();
-        pad.sleep_responsive(0.300);
+        pad.sleep_responsive(0.350);
+        pad.press_dpad_up();
+        pad.sleep_responsive(0.350);
         pad.press_a();
         pad.sleep_responsive(1.000);
     }
