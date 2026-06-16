@@ -1,6 +1,6 @@
 [package]
 name = "free-bot"
-version = "1.1.0"
+version = "1.2.0"
 description = "FH6 Free Bot"
 authors = ["1Stalk"]
 license = "MIT"
@@ -32,14 +32,14 @@ image = "0.25"
 core-bot = { path = "core-bot" }
 
 [profile.release]
-opt-level = "z"      # оптимизация на минимальный размер кода (вместо скорости)
-lto = true           # Link-Time Optimization — убирает мёртвый код между крейтами
-strip = true         # убирает debug-символы из финального бинаря
-codegen-units = 1    # единый блок кодогенерации — максимальный эффект LTO
-panic = "abort"      # без раскрутки стека — убирает unwind-таблицы
+opt-level = "z"      # optimize for binary size (instead of speed)
+lto = true           # Link-Time Optimization - removes dead code across crates
+strip = true         # strip debug symbols from the final binary
+codegen-units = 1    # single codegen unit - maximum LTO effect
+panic = "abort"      # no stack unwinding - removes unwind tables
 
 [profile.dev]
-opt-level = 2        # ускоряет выполнение собственного кода в dev режиме в 10+ раз
+opt-level = 2        # speeds up execution of local code in dev mode by 10x+
 
 [profile.dev.package."*"]
-opt-level = 3        # компилирует библиотеки обработки изображений с максимальной скоростью в dev режиме
+opt-level = 3        # compile image processing libraries with maximum speed in dev mode
