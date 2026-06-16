@@ -288,11 +288,11 @@ fn navigate(ctx: &BotFSMContext) -> bool {
         
         // ── Step 5: A → select target map (first in My History) ──────────────
         pad.press_a();
-        pad.sleep_responsive(2.500);
+        pad.sleep_responsive(4.000);
 
         // ── Step 6: A → single player ───────────────────────
         pad.press_a();
-        pad.sleep_responsive(2.500);
+        pad.sleep_responsive(3.500);
     }
 
     // ── Step 7: Car selection ─────────────────────────────────────────────
