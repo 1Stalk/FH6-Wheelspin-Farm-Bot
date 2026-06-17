@@ -762,7 +762,7 @@ fn run_spend_sp_macro(ctx: &BotFSMContext, is_last: bool) -> bool {
     {
         let mut pad = ctx.pad.lock().unwrap();
         pad.press_b();
-        pad.sleep_responsive(0.500);
+        pad.sleep_responsive(1.200);
 
         pad.press_dpad_down();
         pad.sleep_responsive(0.300);
