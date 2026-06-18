@@ -142,10 +142,6 @@ fn run_driving_monitor(ctx: &BotFSMContext) -> bool {
     true
 }
 
-fn check_driving_hud(ctx: &BotFSMContext, frame: &image::RgbImage) -> bool {
-    is_on_screen(ctx, frame, "autopilot_driving_disabled.png", 0.80, None)
-        || is_on_screen(ctx, frame, "autopilot_driving.png", 0.80, None)
-}
 
 fn ensure_menu_and_cursor(ctx: &BotFSMContext) -> bool {
     let max_wait = Duration::from_secs(30);

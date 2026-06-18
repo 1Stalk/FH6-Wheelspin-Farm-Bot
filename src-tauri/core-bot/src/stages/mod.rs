@@ -131,6 +131,43 @@ pub fn run_loop(ctx: &BotFSMContext) {
                     }
                 }
                 StageResult::Failed => {
+                    if current_stage.starts_with("nav_to_") {
+                        ctx.logger.warn(&format!("Navigation stage [{}] failed. Starting recovery/retry sequence...", current_stage));
+                        
+                        let mut recovered = false;
+                        for attempt in 1..=5 {
+                            if ctx.is_stop_requested.load(Ordering::Relaxed) {
+                                break;
+                            }
+                            ctx.logger.info(&format!("Recovery attempt {}/5 for [{}]...", attempt, current_stage));
+                            
+                            // 1. Recover to driving/freeroam
+                            if attempt_recovery(ctx, check_driving_hud) {
+                                ctx.logger.info("Successfully recovered to freeroam. Opening pause menu...");
+                                // 2. Open pause menu
+                                if open_pause_menu(ctx) {
+                                    ctx.logger.info("Pause menu opened. Ready to retry navigation.");
+                                    recovered = true;
+                                    break;
+                                } else {
+                                    ctx.logger.warn("Failed to open pause menu after recovering to freeroam.");
+                                }
+                            } else {
+                                ctx.logger.warn("Failed to recover to freeroam.");
+                            }
+                            
+                            // Sleep a bit before the next recovery attempt
+                            ctx.smart_sleep(2.0);
+                        }
+                        
+                        if recovered {
+                            ctx.logger.info(&format!("Retrying stage [{}]...", current_stage));
+                            continue; // Loop back and execute the same `current_stage` again
+                        } else {
+                            ctx.logger.error(&format!("All 5 recovery attempts failed for stage [{}]. Stopping bot.", current_stage));
+                        }
+                    }
+
                     ctx.set_state(FSMState::Error);
                     if let Some(ref handle) = ctx.app_handle {
                         use serde_json::json;
@@ -440,7 +477,25 @@ where
     false
 }
 
+pub(crate) fn check_driving_hud(ctx: &BotFSMContext, frame: &image::RgbImage) -> bool {
+    is_on_screen(ctx, frame, "autopilot_driving_disabled.png", 0.80, None)
+        || is_on_screen(ctx, frame, "autopilot_driving.png", 0.80, None)
+}
+
 pub(crate) fn open_pause_menu(ctx: &BotFSMContext) -> bool {
+    // Check if the pause menu is already open before pressing start
+    {
+        let mut capture = ctx.capture.lock().unwrap();
+        if let Some(frame) = capture.grab_frame() {
+            if is_on_screen(ctx, &frame, "pause_menu.png", 0.85, None)
+                || is_on_screen(ctx, &frame, "pause_menu_1st_page.png", 0.85, None)
+            {
+                ctx.logger.info("Hub: Pause Menu is already open.");
+                return true;
+            }
+        }
+    }
+
     let max_attempts = 5;
     for attempt in 1..=max_attempts {
         if ctx.is_stop_requested.load(Ordering::Relaxed) {

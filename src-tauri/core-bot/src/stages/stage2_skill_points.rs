@@ -69,10 +69,6 @@ pub fn run(ctx: &BotFSMContext) -> StageResult {
     }
 }
 
-fn check_driving_hud(ctx: &BotFSMContext, frame: &image::RgbImage) -> bool {
-    is_on_screen(ctx, frame, "autopilot_driving_disabled.png", 0.80, None)
-        || is_on_screen(ctx, frame, "autopilot_driving.png", 0.80, None)
-}
 
 fn get_best_match_score(ctx: &BotFSMContext, frame: &image::RgbImage, template_name: &str) -> f32 {
     let matches = find_all_matches(ctx, frame, template_name, 0.40, None);
