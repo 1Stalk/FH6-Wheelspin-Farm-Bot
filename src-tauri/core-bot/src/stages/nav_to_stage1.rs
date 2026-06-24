@@ -217,6 +217,38 @@ fn find_and_select_car(
         // Find selection cursor using lime outline
         let cursor_pos = crate::vision::find_car_cursor_lime(&frame, scale);
 
+        // Pre-check: If the cursor is already on the target car, select it immediately
+        if let Some((cursor_col, cursor_row)) = cursor_pos {
+            let cell_cx = crate::vision::CAR_GRID_START_X + cursor_col as f32 * crate::vision::CAR_CELL_W;
+            let cell_cy = crate::vision::CAR_GRID_START_Y + cursor_row as f32 * crate::vision::CAR_CELL_H;
+            let cell_rx = (cell_cx - crate::vision::CAR_CELL_W / 2.0).max(0.0) as i32;
+            let cell_ry = (cell_cy - crate::vision::CAR_CELL_H / 2.0).max(0.0) as i32;
+            let cell_rw = crate::vision::CAR_CELL_W as i32;
+            let cell_rh = crate::vision::CAR_CELL_H as i32;
+
+            let is_car = is_on_screen(
+                ctx,
+                &frame,
+                car_template,
+                0.75, // Lower threshold since cursor highlight changes cell colors
+                Some((cell_rx, cell_ry, cell_rw, cell_rh)),
+            );
+
+            if is_car {
+                ctx.logger.info(&format!(
+                    "[Nav→S1] Cursor is already pointing to the target car ({})! Selecting it.",
+                    car_name_log
+                ));
+                drop(capture);
+                {
+                    let mut pad = ctx.pad.lock().unwrap();
+                    pad.press_a();
+                    pad.sleep_responsive(1.000);
+                }
+                return true;
+            }
+        }
+
         // Scan all 12 cells for candidates
         let mut candidates = Vec::new();
         for r in 0..3 {

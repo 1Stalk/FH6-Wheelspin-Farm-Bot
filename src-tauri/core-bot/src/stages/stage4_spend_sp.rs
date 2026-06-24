@@ -64,9 +64,7 @@ pub fn run(ctx: &BotFSMContext) -> StageResult {
 
 fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
     let mut menu_open = false;
-    let start_total = std::time::Instant::now();
-    ctx.logger
-        .info("[select_subaru_brand] Starting manufacturer selection...");
+    ctx.logger.info("[select_subaru_brand] Starting manufacturer selection...");
 
     // Retry loop to open filter menu in case first BACK press is ignored
     for attempt in 1..=3 {
@@ -78,140 +76,84 @@ fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
             "[select_subaru_brand] Attempt {}/3: Pressing BACK button...",
             attempt
         ));
-        let start_back = std::time::Instant::now();
         {
             let mut pad = ctx.pad.lock().unwrap();
             pad.press(BUTTON_BACK);
-            pad.sleep_responsive(0.600);
+            pad.sleep_responsive(1.200);
         }
-        ctx.logger.info(&format!(
-            "[select_subaru_brand] Press BACK + sleep took {} ms. Grabbing frame...",
-            start_back.elapsed().as_millis()
-        ));
 
-        let start_grab = std::time::Instant::now();
         let mut capture = ctx.capture.lock().unwrap();
         let frame = match capture.grab_frame() {
-            Some(f) => {
-                ctx.logger.info(&format!(
-                    "[select_subaru_brand] Frame grabbed in {} ms. Size: {}x{}",
-                    start_grab.elapsed().as_millis(),
-                    f.width(),
-                    f.height()
-                ));
-                f
-            }
+            Some(f) => f,
             None => {
-                ctx.logger.warn(&format!(
-                    "[select_subaru_brand] Grab frame failed. Took {} ms.",
-                    start_grab.elapsed().as_millis()
-                ));
+                ctx.logger.warn("[select_subaru_brand] Grab frame failed, retrying...");
                 continue;
             }
         };
 
-        // 1. Check if we are still in the main Car Selection menu
-        ctx.logger
-            .info("[select_subaru_brand] Checking if still on car_selection_menu.png...");
-        let start_check = std::time::Instant::now();
-        let still_on_selection = is_on_screen(ctx, &frame, "car_selection_menu.png", 0.80, None);
-        ctx.logger.info(&format!(
-            "[select_subaru_brand] Still on selection menu: {} (took {} ms)",
-            still_on_selection,
-            start_check.elapsed().as_millis()
-        ));
-        if still_on_selection {
+        if is_on_screen(ctx, &frame, "car_selection_menu.png", 0.80, None) {
             continue;
         }
 
-        // 2. Check if either brand selection cursor or Subaru logo is visible
-        ctx.logger
-            .info("[select_subaru_brand] Checking if brand filter menu elements are visible...");
-        let start_check2 = std::time::Instant::now();
         let cursor_visible = is_on_screen(ctx, &frame, "brand_selection_cursor.png", 0.80, None);
         let subaru_visible = is_on_screen(ctx, &frame, "subaru_brand_big.png", 0.80, None);
-        let subaru_selected_visible =
-            is_on_screen(ctx, &frame, "subaru_brand_big_selected.png", 0.80, None);
+        let subaru_selected = is_on_screen(ctx, &frame, "subaru_brand_big_selected.png", 0.80, None);
         ctx.logger.info(&format!(
-            "[select_subaru_brand] Brand checks took {} ms. Cursor: {}, Subaru: {}, SubaruSelected: {}",
-            start_check2.elapsed().as_millis(), cursor_visible, subaru_visible, subaru_selected_visible
+            "[select_subaru_brand] Brand menu check: cursor={}, subaru={}, subaru_selected={}",
+            cursor_visible, subaru_visible, subaru_selected
         ));
 
-        if cursor_visible || subaru_visible || subaru_selected_visible {
+        if cursor_visible || subaru_visible || subaru_selected {
             menu_open = true;
             break;
         }
     }
 
     if !menu_open {
-        ctx.logger
-            .error("[select_subaru_brand] Failed to open filter menu after 3 attempts.");
+        ctx.logger.error("[select_subaru_brand] Failed to open filter menu after 3 attempts.");
         return false;
     }
 
-    // 2. Press Up once to scroll to the bottom page
-    ctx.logger
-        .info("[select_subaru_brand] Pressing DPAD UP to scroll list to bottom page...");
-    let start_up = std::time::Instant::now();
+    // Press Up to scroll to the bottom of the list (wraps around to end)
     {
         let mut pad = ctx.pad.lock().unwrap();
         pad.press_dpad_up();
         pad.sleep_responsive(1.000);
     }
-    ctx.logger.info(&format!(
-        "[select_subaru_brand] DPAD UP press + sleep took {} ms. Grabbing frame...",
-        start_up.elapsed().as_millis()
-    ));
 
-    // 3. Grab frame again after scrolling
-    let start_grab2 = std::time::Instant::now();
+    // Grab frame after scrolling (retry up to 5x)
     let mut capture = ctx.capture.lock().unwrap();
-    let frame = match capture.grab_frame() {
-        Some(f) => {
-            ctx.logger.info(&format!(
-                "[select_subaru_brand] Scroll frame grabbed in {} ms.",
-                start_grab2.elapsed().as_millis()
-            ));
-            f
+    let mut frame_opt = None;
+    for _retry in 0..5 {
+        if let Some(f) = capture.grab_frame() {
+            frame_opt = Some(f);
+            break;
         }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    let frame = match frame_opt {
+        Some(f) => f,
         None => {
-            ctx.logger
-                .error("[select_subaru_brand] Failed to grab frame after scroll.");
+            ctx.logger.error("[select_subaru_brand] Failed to grab frame after scroll.");
             return false;
         }
     };
 
-    // Check if Subaru brand is already selected
-    ctx.logger
-        .info("[select_subaru_brand] Checking if Subaru brand is already selected...");
-    let start_check3 = std::time::Instant::now();
-    let subaru_already_selected =
-        is_on_screen(ctx, &frame, "subaru_brand_big_selected.png", 0.80, None);
-    ctx.logger.info(&format!(
-        "[select_subaru_brand] Subaru already selected: {} (took {} ms)",
-        subaru_already_selected,
-        start_check3.elapsed().as_millis()
-    ));
-    if subaru_already_selected {
+    // If Subaru is already selected, just confirm
+    if is_on_screen(ctx, &frame, "subaru_brand_big_selected.png", 0.80, None) {
         let mut pad = ctx.pad.lock().unwrap();
         pad.press_a();
         pad.sleep_responsive(0.800);
-        ctx.logger.info(&format!(
-            "[select_subaru_brand] Confirmed selection. Total time: {} ms.",
-            start_total.elapsed().as_millis()
-        ));
+        ctx.logger.info("[select_subaru_brand] Subaru was already selected. Confirmed.");
         return true;
     }
 
-    // 4. Detect Subaru logo and navigation offsets using new lime-pixel detector
-    ctx.logger
-        .info("[select_subaru_brand] Searching for Subaru logo and grid offsets...");
-    let subaru_pos = find_template(ctx, &frame, "subaru_brand_big.png", 0.80, None);
+    // Find Subaru logo and calculate navigation offsets
+    let subaru_pos = find_template(ctx, &frame, "subaru_brand_big.png", 0.70, None);
     let (sx, sy) = match subaru_pos {
         Some(s) => s,
         None => {
-            ctx.logger
-                .error("[select_subaru_brand] Could not find Subaru logo on screen.");
+            ctx.logger.error("[select_subaru_brand] Could not find Subaru logo on screen.");
             return false;
         }
     };
@@ -220,20 +162,17 @@ fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
     let (cols_diff, rows_diff) = match offsets {
         Some(o) => o,
         None => {
-            ctx.logger
-                .error("[select_subaru_brand] Could not detect active brand cursor using lime outline.");
+            ctx.logger.error("[select_subaru_brand] Could not detect active brand cursor.");
             return false;
         }
     };
 
     ctx.logger.info(&format!(
-        "[select_subaru_brand] Computed offset: cols_diff={}, rows_diff={}",
+        "[select_subaru_brand] Navigating to Subaru: cols_diff={}, rows_diff={}",
         cols_diff, rows_diff
     ));
 
     drop(capture);
-    // 7. Move cursor to the target logo and confirm
-    let start_nav = std::time::Instant::now();
     {
         let mut pad = ctx.pad.lock().unwrap();
         if rows_diff > 0 {
@@ -245,22 +184,16 @@ fn select_subaru_brand(ctx: &BotFSMContext) -> bool {
         if cols_diff > 0 {
             pad.navigate(crate::controller::BUTTON_DPAD_RIGHT, cols_diff as usize);
         } else if cols_diff < 0 {
-            pad.navigate(
-                crate::controller::BUTTON_DPAD_LEFT,
-                cols_diff.abs() as usize,
-            );
+            pad.navigate(crate::controller::BUTTON_DPAD_LEFT, cols_diff.abs() as usize);
         }
 
         pad.press_a();
         pad.sleep_responsive(0.800);
     }
-    ctx.logger.info(&format!(
-        "[select_subaru_brand] Navigation and confirm took {} ms. Total select time: {} ms.",
-        start_nav.elapsed().as_millis(),
-        start_total.elapsed().as_millis()
-    ));
+    ctx.logger.info("[select_subaru_brand] Subaru brand selected.");
     true
 }
+
 
 fn find_and_select_new_car(ctx: &BotFSMContext) -> bool {
     let max_scrolls = 12;
