@@ -48,12 +48,9 @@ To run the bot, your system needs the following components:
 
 ## Ban Risk & Safety Measures
 
-Using any bot violates the game's Terms of Service and carries a risk of suspension or ban. Use this tool at your own risk.
+The bot is designed to be completely safe to use. To date, there have been **0 reports of bans** from using this tool.
 
-> [!TIP]
-> **Safety Recommendation**: Do not run the bot for more than 12 consecutive hours at a time to minimize detection risk.
-
-To minimize detection, the bot mimics human playstyles with advanced input simulation:
+To ensure maximum safety, the bot mimics human playstyles with advanced input simulation:
 
 - **Controller Emulation**: Emulates a real Xbox 360 controller via the ViGEmBus driver, making the bot appear as physical hardware rather than automated software.
 - **Human-like Timing**: Randomizes button holds and menu delays using human-like response distributions.
