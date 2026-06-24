@@ -919,14 +919,15 @@ fn find_and_select_player_subaru(ctx: &BotFSMContext) -> bool {
                 let cell_rw = crate::vision::CAR_CELL_W as i32;
                 let cell_rh = crate::vision::CAR_CELL_H as i32;
 
-                let is_car = is_on_screen(
+                let matches = find_all_matches(
                     ctx,
                     &frame,
                     "subaru_impreza_1998.png",
                     0.85,
                     Some((cell_rx, cell_ry, cell_rw, cell_rh)),
                 );
-                if is_car {
+                if !matches.is_empty() {
+                    let best_score = matches[0].2;
                     let is_class_b = is_on_screen(
                         ctx,
                         &frame,
@@ -935,7 +936,7 @@ fn find_and_select_player_subaru(ctx: &BotFSMContext) -> bool {
                         Some((cell_rx, cell_ry, cell_rw, cell_rh)),
                     );
                     if !is_class_b {
-                        candidates.push((c, r));
+                        candidates.push((c, r, best_score));
                     }
                 }
             }
@@ -954,8 +955,18 @@ fn find_and_select_player_subaru(ctx: &BotFSMContext) -> bool {
 
             let (cursor_col, cursor_row) = cursor_pos.unwrap();
 
-            // Sort candidates by Manhattan-distance priority from cursor
-            candidates.sort_by_key(|c| ((c.0 as i32 - cursor_col).abs(), (c.1 as i32 - cursor_row).abs()));
+            // Sort candidates by match score descending, fallback to Manhattan-distance if scores are very close
+            candidates.sort_by(|a, b| {
+                let score_diff = b.2 - a.2;
+                if score_diff.abs() < 0.015 {
+                    let dist_a = (a.0 as i32 - cursor_col).abs() + (a.1 as i32 - cursor_row).abs();
+                    let dist_b = (b.0 as i32 - cursor_col).abs() + (b.1 as i32 - cursor_row).abs();
+                    dist_a.cmp(&dist_b)
+                } else {
+                    b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal)
+                }
+            });
+
             let target = candidates[0];
             let target_col = target.0;
             let target_row = target.1;
