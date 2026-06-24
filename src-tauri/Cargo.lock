@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "core-bot"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "chrono",
  "dxgi-capture-rs",
@@ -1284,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "free-bot"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "core-bot",
  "image",

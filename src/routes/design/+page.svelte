@@ -659,7 +659,7 @@
     <!-- Footer -->
     <div class="app-footer">
       <span class="footer-left">FH6 WHEELSPIN FARM BOT</span>
-      <span class="footer-right mono">v1.2.2 · FH6WheelspinFarmBot</span>
+      <span class="footer-right mono">v1.2.3 · FH6WheelspinFarmBot</span>
     </div>
   </div>
 
