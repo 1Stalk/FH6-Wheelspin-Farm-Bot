@@ -31,26 +31,62 @@ If either dependency is absent on first launch, the bot detects it and offers gu
 ## Architecture
 
 ```
-┌─────────────────────────────────┐
-│  SvelteKit UI  (WebView2)       │   Tauri IPC commands:
-│  +page.svelte                   │   start_bot / stop_bot / pause_bot /
-│  Real-time log + stats panel    │   resume_bot / update_config /
-└────────────────┬────────────────┘   run_gamepad_test / run_cv_diagnostics
-                 │ Tauri invoke / emit
-┌────────────────▼────────────────┐
-│  Tauri host  (src-tauri/src/)   │
-│  BotState: Arc<BotFSM>          │
-└────────────────┬────────────────┘
-                 │
-┌────────────────▼────────────────┐
-│  core-bot  (Rust library crate) │
-│  state_machine · stages ·       │
-│  vision · controller · capture  │
-│  config · playback              │
-└─────────────────────────────────┘
+FH6-Wheelspin-Farm-Bot/
+│
+├── src/                                # SvelteKit frontend (compiled into WebView2)
+│   ├── routes/
+│   │   └── +page.svelte                # Single-page app: controls, log console, stage map, stats
+│   └── lib/design/                     # UI components
+│       ├── BotHeader.svelte            # Top bar — connection status, version
+│       ├── ControlSidebar.svelte       # Start/Stop/Pause buttons, cycle counter
+│       ├── LogConsole.svelte           # Real-time log stream (Tauri "log" events)
+│       ├── SettingsModal.svelte        # Config editor — all BotConfig fields
+│       ├── ChooseCarModal.svelte       # Car selection for Stage 1 / Stage 2
+│       ├── StageCard.svelte            # Per-stage toggle + iteration control
+│       ├── StageMap.svelte             # Visual 4-stage cycle diagram
+│       ├── StatusPill.svelte           # FSM state badge (Idle / Running / Paused …)
+│       ├── StartNoticeModal.svelte     # Pre-start checklist shown on first run
+│       └── WelcomeModal.svelte         # Initial Setup wizard (deps check, resolution)
+│
+├── src-tauri/                          # Tauri host (Rust)
+│   ├── src/
+│   │   └── lib.rs                      # Tauri IPC commands → BotFSM methods;
+│   │                                   # ViGEmBus auto-installer; CV diagnostics runner
+│   ├── tauri.conf.json                 # App name, window size, bundle config
+│   ├── Cargo.toml                      # Workspace root; release profile (LTO, strip, opt-z)
+│   │
+│   └── core-bot/                       # Rust library crate — all bot logic
+│       ├── src/
+│       │   ├── state_machine.rs        # BotFSM + BotFSMContext: FSM states, start/stop/pause,
+│       │   │                           # session counters, smart_sleep, broadcast_status
+│       │   ├── config.rs               # BotConfig: JSON persistence, resolve_conflicts()
+│       │   ├── capture.rs              # DXGI screen capture, window find/focus (Win32 API)
+│       │   ├── controller.rs           # ViGEmBus virtual Xbox 360 pad; Ruckig OTG trajectories;
+│       │   │                           # OpenSimplex tremor noise; HumanTiming lognormal delays
+│       │   ├── playback.rs             # Binary recording playback (amplitude/time jitter, noise)
+│       │   ├── vision.rs               # Two-pass NCC template matching; IntegralImage;
+│       │   │                           # grayscale cache; brand grid navigation offsets
+│       │   └── stages/
+│       │       ├── mod.rs              # run_loop(); stage transition table; attempt_recovery();
+│       │       │                       # open_pause_menu(); HSV cell-state classifier
+│       │       ├── nav_to_stage1.rs    # Navigate pause menu → Colossus race map
+│       │       ├── stage1_colossus.rs  # Run Colossus race (autopilot monitor, credit accrual)
+│       │       ├── nav_to_stage2.rs    # Navigate → Eventlab map
+│       │       ├── stage2_skill_points.rs  # Run Eventlab map N times (+10 SP each)
+│       │       ├── nav_to_stage3.rs    # Navigate → Collection Journal
+│       │       ├── stage3_buy_cars.rs  # Bulk-buy Subaru 22B in journal
+│       │       ├── nav_to_stage4.rs    # Navigate → Spend SP menu
+│       │       └── stage4_spend_sp.rs  # Purchase talent nodes; garage cleanup
+│       │
+│       ├── templates/                  # 50 PNG templates compiled into binary via include_bytes!
+│       │                               # (menus, brand logos, car thumbnails, HUD indicators)
+│       └── recordings/                 # 201 binary controller recordings (.bin, 28 bytes/sample)
+│                                       # 5–6 variants per action key (stick axes, triggers)
+│
+├── package.json                        # npm workspace (SvelteKit + Vite + Tauri CLI)
+├── svelte.config.js
+└── vite.config.js
 ```
-
-The bot backend (`core-bot`) is a separate Rust workspace crate. It runs the farm loop on a dedicated background thread spawned by `BotFSM::start()`. The Tauri host holds `Arc<BotFSM>` in Tauri managed state. The UI receives live updates via Tauri `emit("status", …)` and `emit("log", …)` events pushed from the background thread.
 
 ---
 
