@@ -596,30 +596,64 @@ fn run_spend_sp_macro(ctx: &BotFSMContext, is_last: bool) -> bool {
                 std::thread::sleep(Duration::from_millis(300));
             }
         } else {
-            let cols_diff = target_col as i32 - cursor_col;
-            let rows_diff = target_row as i32 - cursor_row;
-            ctx.logger.info(&format!(
-                "[Stage4 Upgrade] Cursor is at ({},{}), target is at ({},{}). Navigating: cols_diff={}, rows_diff={}",
-                cursor_col, cursor_row, target_col, target_row, cols_diff, rows_diff
-            ));
+            let path_opt = find_grid_path(
+                (cursor_col, cursor_row),
+                (target_col as i32, target_row as i32),
+                &empty_cells,
+            );
 
             drop(capture);
             {
-                // Move cursor toward target skill cell
                 let mut pad = ctx.pad.lock().unwrap();
-                if cols_diff > 0 {
-                    pad.navigate(crate::controller::BUTTON_DPAD_RIGHT, cols_diff as usize);
-                } else if cols_diff < 0 {
-                    pad.navigate(
-                        crate::controller::BUTTON_DPAD_LEFT,
-                        cols_diff.abs() as usize,
-                    );
-                }
+                if let Some(path) = path_opt {
+                    ctx.logger.info(&format!(
+                        "[Stage4 Upgrade] Cursor is at ({},{}), target is at ({},{}). Found path: {:?}",
+                        cursor_col, cursor_row, target_col, target_row, path
+                    ));
 
-                if rows_diff > 0 {
-                    pad.navigate(crate::controller::BUTTON_DPAD_DOWN, rows_diff as usize);
-                } else if rows_diff < 0 {
-                    pad.navigate(crate::controller::BUTTON_DPAD_UP, rows_diff.abs() as usize);
+                    let mut current = (cursor_col, cursor_row);
+                    for next in path {
+                        let col_step = next.0 - current.0;
+                        let row_step = next.1 - current.1;
+
+                        let button = if col_step > 0 {
+                            crate::controller::BUTTON_DPAD_RIGHT
+                        } else if col_step < 0 {
+                            crate::controller::BUTTON_DPAD_LEFT
+                        } else if row_step > 0 {
+                            crate::controller::BUTTON_DPAD_DOWN
+                        } else {
+                            crate::controller::BUTTON_DPAD_UP
+                        };
+
+                        if !pad.press(button) {
+                            return false;
+                        }
+                        current = next;
+                    }
+                } else {
+                    ctx.logger.warn(&format!(
+                        "[Stage4 Upgrade] No path found from ({},{}) to ({},{}). Falling back to direct navigation.",
+                        cursor_col, cursor_row, target_col, target_row
+                    ));
+
+                    let cols_diff = target_col as i32 - cursor_col;
+                    let rows_diff = target_row as i32 - cursor_row;
+
+                    if cols_diff > 0 {
+                        pad.navigate(crate::controller::BUTTON_DPAD_RIGHT, cols_diff as usize);
+                    } else if cols_diff < 0 {
+                        pad.navigate(
+                            crate::controller::BUTTON_DPAD_LEFT,
+                            cols_diff.abs() as usize,
+                        );
+                    }
+
+                    if rows_diff > 0 {
+                        pad.navigate(crate::controller::BUTTON_DPAD_DOWN, rows_diff as usize);
+                    } else if rows_diff < 0 {
+                        pad.navigate(crate::controller::BUTTON_DPAD_UP, rows_diff.abs() as usize);
+                    }
                 }
 
                 pad.sleep_responsive(0.150);
@@ -711,6 +745,54 @@ fn run_spend_sp_macro(ctx: &BotFSMContext, is_last: bool) -> bool {
     }
 
     true
+}
+
+pub(crate) fn find_grid_path(
+    start: (i32, i32),
+    target: (i32, i32),
+    empty_cells: &std::collections::HashSet<(usize, usize)>,
+) -> Option<Vec<(i32, i32)>> {
+    let mut queue = std::collections::VecDeque::new();
+    let mut visited = std::collections::HashSet::new();
+    let mut parent = std::collections::HashMap::new();
+
+    queue.push_back(start);
+    visited.insert(start);
+
+    while let Some(curr) = queue.pop_front() {
+        if curr == target {
+            let mut path = Vec::new();
+            let mut node = curr;
+            while node != start {
+                path.push(node);
+                node = *parent.get(&node)?;
+            }
+            path.reverse();
+            return Some(path);
+        }
+
+        let (c, r) = curr;
+        let neighbors = vec![
+            (c + 1, r),
+            (c - 1, r),
+            (c, r + 1),
+            (c, r - 1),
+        ];
+
+        for (nc, nr) in neighbors {
+            if nc >= 0 && nc < 4 && nr >= 0 && nr < 4 {
+                if !empty_cells.contains(&(nc as usize, nr as usize)) {
+                    if !visited.contains(&(nc, nr)) {
+                        visited.insert((nc, nr));
+                        parent.insert((nc, nr), curr);
+                        queue.push_back((nc, nr));
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 pub(crate) fn find_best_cursor(
