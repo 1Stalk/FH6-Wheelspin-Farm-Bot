@@ -121,7 +121,7 @@ Driving time accrues to `session_driving_seconds`; every 345 s of tracked drive 
 
 ### Stage 2 — Eventlab Skill Points farm
 
-The bot loads a specific Eventlab map optimised for skill point generation and runs it a configurable number of times (`stage2_iterations`). A difficulty setup flow runs before the first iteration to configure the race consistently. Each iteration uses a randomly-selected pre-recorded controller session from the playback library (see [Playback System](#playback-system)). Race finish is confirmed by matching `stage2_finish_banner.png` / `stage2_post_finish.png`. Each successful iteration credits +10 SP to the session counter.
+The bot loads a specific Eventlab map optimised for skill point farm and runs it a configurable number of times (`stage2_iterations`). A difficulty setup flow runs before the first iteration to configure the race consistently. Each iteration uses a randomly-selected pre-recorded controller session from the playback library (see [Playback System](#playback-system)). Race finish is confirmed by matching `stage2_finish_banner.png` / `stage2_post_finish.png`. Each successful iteration credits +10 SP to the session counter.
 
 ### Stage 3 — Buy Subaru 22B in the Collection Journal
 
