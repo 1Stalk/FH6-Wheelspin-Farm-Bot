@@ -28,6 +28,72 @@ If either dependency is absent on first launch, the bot detects it and offers gu
 
 ---
 
+## Auto-Farming Cycle
+
+The bot executes a configurable 4-stage loop. Each stage is individually toggleable; skipped stages are handled by the transition table in `get_next_stage_transition()` so the loop always progresses consistently.
+
+```
+┌────────────────────────────────────┐      ┌────────────────────────────────────┐
+│ Stage 1: Colossus Autopilot        │      │ Stage 2: Eventlab farm map         │
+│ Farm credits.                      │─────>│ Farm SP.                           │
+└────────────────────────────────────┘      └────────────────────────────────────┘
+                    ▲                                       │
+                    │                                       │
+                    │                                       ▼
+┌────────────────────────────────────┐      ┌────────────────────────────────────┐
+│ Stage 4: Unlock Super Wheelspins   │      │ Stage 3: Buy cars in journal       │
+│ Spend SP on Subaru 22B + Cleanup   │<─────│ Spend credits. Bulk buy Subaru 22B │
+└────────────────────────────────────┘      └────────────────────────────────────┘
+```
+
+### Stage 1 — Colossus Autopilot (credit farming)
+
+- Navigates to the Colossus race via the pause menu map.
+- Sets race difficulty to the maximum payout configuration: `D-pad Down → A → A → D-pad Down → hold D-pad Right 2 s → D-pad Left → Start`.
+- Launches the race, then immediately activates the in-game autopilot: `D-pad Down + D-pad Left`.
+
+A polling loop runs every second checking two signals:
+
+- **Template match** — `autopilot_driving.png` / `autopilot_driving_disabled.png` via two-pass NCC at ≥0.80 threshold (see [Vision](#vision--template-matching)).
+- **Color check** — `check_autopilot_color()` samples the matched bounding box for OpenCV-HSV green pixels (H∈[80,105], S≥80, V≥80) at ≥8% of total pixels. Green means active; grey means the in-game AI has stalled.
+
+If the autopilot icon is present but grey, the bot re-sends the `D-pad Down + D-pad Left` activation sequence. If no driving HUD is detected for 15 consecutive seconds, `attempt_recovery()` fires (see [Error Recovery](#error-recovery)).
+
+- Driving time accrues to `session_driving_seconds`; every 345 s of tracked drive time adds 160,000 credits to the session counter.
+- Duration is controlled by `stage1_duration` (units: 6-minute laps).
+- After the timer expires, the bot opens the pause menu, selects **Quit to Freeroam**, and confirms open-world return by matching `autopilot_icon.png` at ≥0.80 NCC.
+
+### Stage 2 — Eventlab Skill Points farm
+
+- Loads a specific Eventlab map optimised for skill point farming and runs it `stage2_iterations` times.
+- A difficulty setup flow runs before the first iteration to configure the race consistently.
+- Each iteration uses a randomly-selected pre-recorded controller session from the playback library (see [Playback System](#playback-system)).
+- Race finish is confirmed by matching `stage2_finish_banner.png` / `stage2_post_finish.png`.
+- Each successful iteration credits **+10 SP** to the session counter.
+
+### Stage 3 — Buy Subaru 22B in the Collection Journal
+
+- Opens the Collection Journal via the pause menu, then opens the manufacturer brand filter and navigates to Subaru.
+- Brand navigation is vision-guided: `find_template()` locates the Subaru logo (`journal_subaru_brand.png`) and `calculate_brand_navigation_offsets()` computes the D-pad step delta from the current cursor position to Subaru's grid cell.
+- Buys `stage3_iterations` copies of the Subaru Impreza 22B (~86,000 credits each), using `journal_subaru_22b.png` / `journal_subaru_22b_selected.png` template matching to confirm selection.
+
+### Stage 4 — Spend SP on the 22B Talent Tree
+
+- Opens the Spend SP menu, selects the Subaru 22B, and purchases skill nodes.
+- Per-cell state is determined by sampling a 50×50 px region around each node's grid center (grid origin: 500 px, 320 px; cell size: 154×154 px) and evaluating pixel HSV ratios:
+
+| HSV range                      | Ratio threshold | State       |
+| ------------------------------ | --------------- | ----------- |
+| H∈[140,175], S≥80, V≥80 (pink) | >12%            | `Purchased` |
+| S≤45, V≥195 (white)            | >15%            | `Available` |
+| Neither                        | —               | `Locked`    |
+
+- Purchases all available nodes per iteration.
+- After all SP iterations complete, `run_garage_cleanup()` sells the accumulated 22B cars to prevent garage overflow.
+- The number of purchased cars (Stage 3) always equals `stage4_iterations`, enforced by `BotConfig::resolve_conflicts()`.
+
+---
+
 ## Architecture
 
 ```
@@ -90,57 +156,6 @@ FH6-Wheelspin-Farm-Bot/
 
 ---
 
-## Auto-Farming Cycle
-
-The bot executes a configurable 4-stage loop. Each stage is individually toggleable; skipped stages are handled by the transition table in `get_next_stage_transition()` so the loop always progresses consistently.
-
-```
-┌────────────────────────────────────┐      ┌────────────────────────────────────┐
-│ Stage 1: Colossus Autopilot        │      │ Stage 2: Eventlab farm map         │
-│ Farm credits.                      │─────>│ Farm SP.                           │
-└────────────────────────────────────┘      └────────────────────────────────────┘
-                    ▲                                       │
-                    │                                       │
-                    │                                       ▼
-┌────────────────────────────────────┐      ┌────────────────────────────────────┐
-│ Stage 4: Unlock Super Wheelspins   │      │ Stage 3: Buy cars in journal       │
-│ Spend SP on Subaru 22B + Cleanup   │<─────│ Spend credits. Bulk buy Subaru 22B │
-└────────────────────────────────────┘      └────────────────────────────────────┘
-```
-
-### Stage 1 — Colossus Autopilot (credit farming)
-
-The bot navigates to the Colossus race via the pause menu map, sets the race difficulty to the maximum payout configuration (D-pad Down → A → A → D-pad Down → hold D-pad Right 2 s → D-pad Left → Start to save), launches the race, then immediately activates the in-game autopilot (D-pad Down + D-pad Left). A polling loop runs every second checking two signals:
-
-- **Template match** — `autopilot_driving.png` / `autopilot_driving_disabled.png` via two-pass NCC at ≥0.80 threshold (see [Vision](#vision--template-matching)).
-- **Color check** — `check_autopilot_color()` samples the matched bounding box for OpenCV-HSV green pixels (H∈[80,105], S≥80, V≥80) at ≥8% of total pixels. Green means active; grey means the in-game AI has stalled.
-
-If the autopilot icon is present but grey, the bot re-sends the D-pad Down + D-pad Left activation sequence. If no driving HUD is detected for 15 consecutive seconds, `attempt_recovery()` fires (see [Error Recovery](#error-recovery)).
-
-Driving time accrues to `session_driving_seconds`; every 345 s of tracked drive time adds 160,000 credits to the session counter. Duration is controlled by `stage1_duration` (units: 6-minute laps). After the timer expires, the bot opens the pause menu, selects "Quit to Freeroam", and confirms open-world return by matching `autopilot_icon.png` at ≥0.80 NCC.
-
-### Stage 2 — Eventlab Skill Points farm
-
-The bot loads a specific Eventlab map optimised for skill point farm and runs it a configurable number of times (`stage2_iterations`). A difficulty setup flow runs before the first iteration to configure the race consistently. Each iteration uses a randomly-selected pre-recorded controller session from the playback library (see [Playback System](#playback-system)). Race finish is confirmed by matching `stage2_finish_banner.png` / `stage2_post_finish.png`. Each successful iteration credits +10 SP to the session counter.
-
-### Stage 3 — Buy Subaru 22B in the Collection Journal
-
-The bot opens the Collection Journal via the pause menu, opens the manufacturer brand filter, and navigates to Subaru. Brand navigation is vision-guided: `find_template()` locates the Subaru logo (`journal_subaru_brand.png`) and `calculate_brand_navigation_offsets()` computes the D-pad step delta from the current cursor position to Subaru's grid cell. The bot then buys `stage3_iterations` copies of the Subaru Impreza 22B (~86,000 credits each), using `journal_subaru_22b.png` / `journal_subaru_22b_selected.png` template matching to confirm selection.
-
-### Stage 4 — Spend SP on the 22B Talent Tree
-
-The bot opens the Spend SP menu, selects the Subaru 22B, and purchases skill nodes. Per-cell state is determined by sampling a 50×50 px region around each node's grid center (grid origin: 500 px, 320 px; cell size: 154×154 px) and evaluating pixel HSV ratios:
-
-| HSV range                      | Ratio threshold | State       |
-| ------------------------------ | --------------- | ----------- |
-| H∈[140,175], S≥80, V≥80 (pink) | >12%            | `Purchased` |
-| S≤45, V≥195 (white)            | >15%            | `Available` |
-| Neither                        | —               | `Locked`    |
-
-The bot purchases all available nodes per iteration. After all SP iterations complete, `run_garage_cleanup()` sells the accumulated 22B cars to prevent garage overflow. The number of purchased cars (Stage 3) always equals `stage4_iterations`, enforced by `BotConfig::resolve_conflicts()`.
-
----
-
 ## Virtual Controller & Human-Motion Emulation
 
 All game inputs are sent through ViGEmBus via the `vigem-client` crate as an Xbox 360 Wired controller (`TargetId::XBOX360_WIRED`). No keyboard or mouse injection is used at any point.
@@ -198,13 +213,15 @@ The per-frame grayscale conversion uses a thread-local `GRAY_CACHE` keyed on poi
 
 Navigation failures trigger an automatic recovery procedure, up to 5 attempts per failed navigation stage:
 
-1. Grab the current frame and check for the pause menu (`pause_menu.png` / `pause_menu_1st_page.png` at ≥0.85 NCC). If detected, press B to return to driving.
-2. Press A (dismiss possible loading dialogs).
-3. Press B up to 3 additional times, checking for a healthy driving HUD after each press.
+1. Grab the current frame and check for the pause menu (`pause_menu.png` / `pause_menu_1st_page.png` at ≥0.85 NCC). If detected, press `B` to return to driving.
+2. Press `A` to dismiss possible loading dialogs.
+3. Press `B` up to 3 additional times, checking for a healthy driving HUD after each press.
 
-A "healthy" state is defined by `check_driving_hud()` — either `autopilot_driving_disabled.png` or `autopilot_driving.png` matching at ≥0.80 NCC. If recovery succeeds, the failed navigation stage is retried from the beginning. After 5 consecutive failed recovery attempts, the FSM transitions to `Error` state, emits an `error` event to the UI, and halts.
+A "healthy" state is defined by `check_driving_hud()` — either `autopilot_driving_disabled.png` or `autopilot_driving.png` matching at ≥0.80 NCC.
 
-Throughout all waits, `smart_sleep()` checks the stop/pause flags every 50 ms, so Pause and Stop commands take effect promptly even mid-stage.
+- If recovery succeeds, the failed navigation stage is retried from the beginning.
+- After 5 consecutive failed recovery attempts, the FSM transitions to `Error` state, emits an `error` event to the UI, and halts.
+- Throughout all waits, `smart_sleep()` checks the stop/pause flags every 50 ms, so Pause and Stop commands take effect promptly even mid-stage.
 
 ---
 
@@ -262,7 +279,10 @@ Two diagnostic commands are exposed via Tauri IPC:
 
 ## Ban Risk
 
-All inputs are sent through ViGEmBus as a virtual Xbox 360 controller — indistinguishable from real hardware at the OS and driver level. No game memory, files, or network traffic are read or modified. All input timing is stochastic (lognormal distributions + Ruckig OTG trajectories + OpenSimplex tremor noise), and there is no fixed-interval heartbeat that could appear as a statistical anomaly in server-side telemetry. To date, **0 ban reports** have been received from users of this tool.
+- All inputs are sent through ViGEmBus as a virtual Xbox 360 controller — indistinguishable from real hardware at the OS and driver level.
+- No game memory, files, or network traffic are read or modified.
+- All input timing is stochastic (lognormal distributions + Ruckig OTG trajectories + OpenSimplex tremor noise) — no fixed-interval heartbeat that could appear as a statistical anomaly in server-side telemetry.
+- To date, **0 ban reports** have been received from users of this tool.
 
 ---
 
